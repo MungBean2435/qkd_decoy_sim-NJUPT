@@ -8,7 +8,7 @@
 
 纯 MATLAB 实现（R2020a 起），不依赖任何工具箱，含代码化 GUI。
 
-[![CI](https://github.com/OWNER/qkd_decoy_sim/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/qkd_decoy_sim/actions/workflows/ci.yml)
+[![CI](https://github.com/MungBean2435/qkd_decoy_sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MungBean2435/qkd_decoy_sim/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -47,16 +47,20 @@ runTests        % 回归自检，全 PASS 说明计算链正常
 批量出图并写入 `results/`：
 
 ```matlab
-run_task1       % 图1：高斯起伏，N = 1e8 / 1e9 / 1e10，不优化
-run_task2       % 图2：高斯 / 霍夫丁 / 切尔诺夫，N = 1e9，逐距离优化 u
-run_task3       % 图3：切尔诺夫，N = 1e9，全局优化 (u, v, P_u, P_v)
-verify          % 一致性核查，写 results/verify.log
+run_task1        % 图1：高斯起伏，N = 1e8 / 1e9 / 1e10，不优化
+run_task2        % 图2：高斯 / 霍夫丁 / 切尔诺夫，N = 1e9，逐距离优化 u
+run_task3        % 图3：切尔诺夫，N = 1e9，全局优化 (u, v, P_u, P_v)
+verify           % 一致性核查，写 results/verify.log
 exportReportData % 报告用数值表 results/report_tables.csv
 ```
 
+> **跨平台字体**：所有中文标注统一走 [`cjkFont.m`](cjkFont.m)，
+> 自动在 Windows（微软雅黑）、macOS（PingFang SC）、Linux（Noto Sans CJK）
+> 中挑一个已安装的，队友不会因为缺字体看到方框或报错。
+
 ## 三、当前结果
 
-三种方法在 $N=10^9,\ \varepsilon=10^{-7}$、未优化参数下的关键数值：
+三种方法在 $N=10^9,\ \varepsilon=10^{-7}$、题目给定未优化参数下的关键数值：
 
 | 方法 | $R(0)$ | $R(100\,\mathrm{km})$ | 最远成码距离 |
 | --- | --- | --- | --- |
@@ -96,6 +100,7 @@ qkd_decoy_sim/
 ├── launch.m              # 一键启动 GUI
 ├── run_task1/2/3.m       # 三个任务的出图脚本（只调内核 + 画图）
 ├── newFig.m saveResult.m # 出图与存盘工具
+├── cjkFont.m             # 跨平台中文字体探测
 ├── runTests.m            # 回归自检（CI 调用）
 ├── selfTest.m verify.m smokeGUI.m exportReportData.m
 ├── results/              # 生成的 PNG + CSV（.fig 已忽略）

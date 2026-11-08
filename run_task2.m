@@ -31,7 +31,7 @@ set(ax, 'XLim', [0 210], 'YLim', [1e-12 5e-2]);
 xlabel(ax, '传输距离 L (km)');
 ylabel(ax, '安全密钥率 R (bit/pulse)');
 title(ax, sprintf('N = 10^9 时三种统计起伏方法对比（逐距离优化信号态 u）'));
-legend(ax, 'Location', 'northeast', 'FontName', 'Microsoft YaHei');
+legend(ax, 'Location', 'northeast', 'FontName', cjkFont());
 grid(ax, 'on');
 
 saveResult(f, 'fig2_three_methods', res{end});
@@ -47,7 +47,7 @@ set(ax2, 'XLim', [0 200], 'YLim', [0 1.4]);
 xlabel(ax2, '传输距离 L (km)');
 ylabel(ax2, '最优信号态光强 u^*');
 title(ax2, '最优信号态光强随距离的演化');
-legend(ax2, 'Location', 'northeast', 'FontName', 'Microsoft YaHei');
+legend(ax2, 'Location', 'northeast', 'FontName', cjkFont());
 grid(ax2, 'on');
 saveResult(f2, 'fig2b_optimal_u', res{end});
 

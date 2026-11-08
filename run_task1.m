@@ -28,7 +28,7 @@ set(ax, 'XLim', [0 220], 'YLim', [1e-12 5e-2]);
 xlabel(ax, '传输距离 L (km)');
 ylabel(ax, '安全密钥率 R (bit/pulse)');
 title(ax, '高斯统计起伏：不同发射脉冲数下的密钥率（未优化）');
-legend(ax, 'Location', 'northeast', 'FontName', 'Microsoft YaHei');
+legend(ax, 'Location', 'northeast', 'FontName', cjkFont());
 grid(ax, 'on');
 
 saveResult(f, 'fig1_gauss_threeN', res{end});

@@ -27,7 +27,7 @@ set(ax, 'XLim', [0 220], 'YLim', [1e-12 5e-2]);
 xlabel(ax, '传输距离 L (km)');
 ylabel(ax, '安全密钥率 R (bit/pulse)');
 title(ax, '切尔诺夫统计起伏：全局优化 (u, v, P_u, P_v) 前后的密钥率');
-legend(ax, 'Location', 'northeast', 'FontName', 'Microsoft YaHei');
+legend(ax, 'Location', 'northeast', 'FontName', cjkFont());
 grid(ax, 'on');
 
 saveResult(f, 'fig3_chernoff_global', g);
@@ -43,7 +43,7 @@ set(ax2, 'XLim', [0 200], 'YLim', [0 1.0]);
 xlabel(ax2, '传输距离 L (km)');
 ylabel(ax2, '优化后的参数值');
 title(ax2, '全局优化得到的参数随距离演化');
-legend(ax2, 'Location', 'northeast', 'FontName', 'Microsoft YaHei');
+legend(ax2, 'Location', 'northeast', 'FontName', cjkFont());
 grid(ax2, 'on');
 saveResult(f2, 'fig3b_optimal_params', g);
 
