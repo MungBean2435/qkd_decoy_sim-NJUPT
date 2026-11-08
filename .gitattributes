@@ -1,0 +1,17 @@
+# 统一换行，避免 Windows / macOS 队友互相制造整文件 diff
+* text=auto eol=lf
+
+*.m         text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.csv       text eol=lf
+*.log       text eol=lf
+.gitignore  text eol=lf
+
+# 二进制
+*.png       binary
+*.jpg       binary
+*.fig       binary
+*.mat       binary
+*.pdf       binary

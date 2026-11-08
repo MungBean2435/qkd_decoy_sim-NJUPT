@@ -1,0 +1,22 @@
+# ---- MATLAB 运行时产物 ----
+*.asv
+*.autosave
+*.m~
+*.slx.r*
+slprj/
+codegen/
+*.mex*
+
+# ---- 生成产物：.fig 是二进制，diff 无意义，不入库；PNG / CSV 保留 ----
+results/*.fig
+
+# ---- 系统与编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# ---- 本地临时脚本 ----
+tmp_*.m
+*_tmp.m

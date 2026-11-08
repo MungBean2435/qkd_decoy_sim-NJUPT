@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: MATLAB R2024a 回归自检
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2024a
+
+      - name: 运行 runTests
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath(genpath(pwd)); runTests
+
+      # 出图脚本依赖 exportgraphics 与中文字体，仅在 Linux 无头环境验证可跑通
+      - name: 出图冒烟测试
+        uses: matlab-actions/run-command@v2
+        with:
+          command: addpath(genpath(pwd)); run_task1
+
+      - name: 上传生成的图与数据
+        uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: |
+            results/*.png
+            results/*.csv
+          if-no-files-found: warn
