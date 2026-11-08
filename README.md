@@ -8,7 +8,7 @@
 
 纯 MATLAB 实现（R2020a 起），不依赖任何工具箱，含代码化 GUI。
 
-[![CI](https://github.com/MungBean2435/qkd_decoy_sim/actions/workflows/ci.yml/badge.svg)](https://github.com/MungBean2435/qkd_decoy_sim/actions/workflows/ci.yml)
+[![CI](https://github.com/MungBean2435/qkd_decoy_sim-NJUPT/actions/workflows/ci.yml/badge.svg)](https://github.com/MungBean2435/qkd_decoy_sim-NJUPT/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---

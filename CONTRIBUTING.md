@@ -9,7 +9,7 @@
 ## 首次拉取
 
 ```bash
-git clone https://github.com/OWNER/qkd_decoy_sim.git
+git clone https://github.com/MungBean2435/qkd_decoy_sim-NJUPT.git
 cd qkd_decoy_sim
 ```
 
