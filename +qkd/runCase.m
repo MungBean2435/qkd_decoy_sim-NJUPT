@@ -24,6 +24,10 @@ if ~isfield(spec, 'opt') || isempty(spec.opt), spec.opt = 'none'; end
 L = spec.L(1) : spec.L(3) : spec.L(2);
 n = numel(L);
 
+% 进度回调采样步长：逐点扫描时最多刷新约 50 次，避免界面被回调拖慢。
+% spec.onProgress 为可选字段：命令行调用不传时行为与本函数原实现完全一致。
+stride = max(1, floor(n / 50));
+
 out = struct();
 out.L   = L;
 out.R   = zeros(1, n);
@@ -44,6 +48,10 @@ switch lower(spec.opt)
         % 固定参数，仅扫描距离
         for i = 1:n
             out.R(i) = rateFor(p, L(i), spec, p.u, p.v, p.Pu, p.Pv);
+            if i == 1 || i == n || mod(i, stride) == 0
+                notifyProgress(spec, i / n, ...
+                    sprintf('扫描距离 L = %.0f km（%d/%d）', L(i), i, n));
+            end
         end
 
     case 'u'
@@ -57,9 +65,14 @@ switch lower(spec.opt)
                 [rmax, k] = max(Rv);
                 out.R(i) = rmax;
                 out.u(i) = ug(k);
+                if i == 1 || i == n || mod(i, stride) == 0
+                    notifyProgress(spec, i / n, ...
+                        sprintf('逐距离优化 u：L = %.0f km（%d/%d）', L(i), i, n));
+                end
             end
         else
             % 整段统一：一个 u 用到底，取使最远成码距离最大的 u
+            notifyProgress(spec, 0, sprintf('固定 u 批量扫描（%d 个候选）…', numel(ug)));
             Rm = zeros(numel(ug), n);
             for i = 1:n
                 Rm(:, i) = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
@@ -67,6 +80,7 @@ switch lower(spec.opt)
             [~, uIdx] = max(sum(Rm > 0, 2));
             out.R = Rm(uIdx, :);
             out.u = ug(uIdx) * ones(1, n);
+            notifyProgress(spec, 1, sprintf('固定 u 扫描完成（u = %.2f）', out.u(1)));
         end
 
     case 'global'
@@ -81,6 +95,9 @@ switch lower(spec.opt)
             out.v(i)  = xb(1) * xb(2);         % v = u * ratio
             out.Pu(i) = xb(3);                 % P_u
             out.Pv(i) = xb(4);                 % P_v
+            % 全局优化单点耗时远高于扫描，逐点上报以保证取消足够及时
+            notifyProgress(spec, i / n, ...
+                sprintf('全局优化 (u, v, P_u, P_v)：L = %.0f km（%d/%d）', L(i), i, n));
         end
 
     otherwise
@@ -182,4 +199,19 @@ for iter = 1:30
     end
 end
 
+end
+
+% ======================================================================
+% 可选的进度回调（界面层通过 spec.onProgress 注入）
+% ======================================================================
+
+function notifyProgress(spec, frac, msg)
+%NOTIFYPROGRESS 若 spec 带 onProgress，则上报归一化进度与提示文字。
+%
+%   回调抛出的异常（例如用户取消）不在此捕获，直接向上传播，
+%   由调用方（QKDApp）识别并收尾。
+
+if isfield(spec, 'onProgress') && ~isempty(spec.onProgress)
+    spec.onProgress(min(max(frac, 0), 1), msg);
+end
 end
