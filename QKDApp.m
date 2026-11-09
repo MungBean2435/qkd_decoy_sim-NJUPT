@@ -10,7 +10,8 @@ classdef QKDApp < handle
 %   答辩时讲完 +qkd/ 的 6 个函数，本文件只需说明“界面怎么把参数喂进去”。
 %
 %   左下角「一键出图」调用 run_task1/2/3（与命令行完全同一套脚本），
-%   按题目默认参数把 Fig.1–3 的 PNG/CSV 写入 results/，带进度条与取消。
+%   按题目默认参数把 Fig.1–3 的 PNG/CSV 写入 results/，带进度条与取消；
+%   生成后的图像会显示在右侧对应标签页中，与曲线叠加区并列。
 %
 %   用法：
 %       launch                % 自动 addpath 后打开窗口
@@ -23,6 +24,11 @@ classdef QKDApp < handle
                 'P^A_{Z|u}  选 Z 基概率', 'P^A_{Z|v}  选 Z 基概率', 'P^B_Z  Bob 选 Z 基', ...
                 'f  纠错效率', 'alpha  损耗(dB/km)', 'eta_d  探测效率', ...
                 'd  暗计数', 'eta_A  本地探测效率', 'd_A  本地暗计数', 'e_d  本底误码'};
+        % 一键出图生成的文件（顺序即标签页顺序，不含扩展名）
+        IMG_NAMES  = {'fig1_gauss_threeN', 'fig2_three_methods', 'fig2b_optimal_u', ...
+                      'fig3_chernoff_global', 'fig3b_optimal_params'};
+        IMG_TITLES = {'图1 N 对比', '图2 三方法', '图2b u*(L)', ...
+                      '图3 全局优化', '图3b 参数'};
     end
 
     properties (Access = public)
@@ -37,6 +43,11 @@ classdef QKDApp < handle
         edLstep           % 距离步长
         btnRun, btnClear, btnExport
         btnTask1, btnTask2, btnTask3, btnTaskAll   % 一键出图
+        tabGroup          % 右侧：曲线 + 生成图像标签页
+        tabCurves         % 「曲线」标签页
+        imgTabs = {}      % 生成图像标签页句柄
+        imgAxes = {}      % 生成图像显示轴
+        imgLabels = {}    % 「尚未生成」占位提示
         ax                % 曲线区
         txtLog            % 状态/日志区
         curves = {}       % 已叠加的曲线：每项 {out, 名称, 颜色}
@@ -173,8 +184,11 @@ classdef QKDApp < handle
                 'Value', {'就绪：修改参数后点击“运行并叠加曲线”。', ...
                           '左下角“一键出图”按题目默认参数生成 Fig.1–3。'});
 
-            % ---------- 右侧：曲线区 ----------
-            app.ax = uiaxes(app.UIFigure, 'Position', [460 40 760 830]);
+            % ---------- 右侧：曲线 + 生成图像 ----------
+            app.tabGroup  = uitabgroup(app.UIFigure, 'Position', [450 20 780 850]);
+            app.tabCurves = uitab(app.tabGroup, 'Title', '曲线');
+
+            app.ax = uiaxes(app.tabCurves, 'Position', [70 55 690 770]);
             app.ax.YScale  = 'log';
             app.ax.FontName = cjkFont();
             app.ax.FontSize = 11;
@@ -186,6 +200,48 @@ classdef QKDApp < handle
             ylabel(app.ax, '安全密钥率 R (bit/pulse)');
             title(app.ax, '安全密钥率随传输距离的变化');
             app.ax.YLim = [1e-12 5e-2];
+
+            % 每个任务图一个标签页；生成前显示占位提示
+            nImg = numel(app.IMG_NAMES);
+            app.imgTabs   = cell(1, nImg);
+            app.imgAxes   = cell(1, nImg);
+            app.imgLabels = cell(1, nImg);
+            for k = 1:nImg
+                t = uitab(app.tabGroup, 'Title', app.IMG_TITLES{k});
+                a = uiaxes(t, 'Position', [10 10 750 790], ...
+                           'XTick', [], 'YTick', [], 'Box', 'off', 'Color', 'w');
+                lb = uilabel(t, 'Position', [60 380 320 22], ...
+                    'Text', '尚未生成：点击左下角对应任务按钮', ...
+                    'HorizontalAlignment', 'center', 'FontName', cjkFont(), ...
+                    'FontColor', [0.55 0.55 0.55]);
+                app.imgTabs{k}   = t;
+                app.imgAxes{k}   = a;
+                app.imgLabels{k} = lb;
+            end
+
+            % 窗口缩放时同步排布右侧标签页内的坐标轴
+            % （uifigure 需先关闭 AutoResizeChildren，SizeChangedFcn 才会触发）
+            app.UIFigure.AutoResizeChildren = 'off';
+            app.UIFigure.SizeChangedFcn = @(~, ~) app.layoutRight();
+            app.layoutRight();
+        end
+
+        function layoutRight(app)
+            % 右侧按像素排布（UI 坐标轴不支持 normalized Units）
+            fp = app.UIFigure.Position;
+            w  = fp(3);  h = fp(4);
+            tgW = max(w - 460, 300);
+            tgH = max(h - 40, 300);
+            app.tabGroup.Position = [450 20 tgW tgH];
+
+            cw = max(tgW - 8, 100);          % 标签页内容区（近似）
+            ch = max(tgH - 36, 100);
+            for k = 1:numel(app.imgAxes)
+                app.imgAxes{k}.Position = [10 10 max(cw - 25, 50) max(ch - 25, 50)];
+                app.imgLabels{k}.Position = [round(cw * 0.2), round(ch * 0.47), ...
+                                             round(cw * 0.6), 22];
+            end
+            app.ax.Position = [70 55 max(cw - 100, 50) max(ch - 85, 50)];
         end
 
         % ============================================================
@@ -263,6 +319,9 @@ classdef QKDApp < handle
                 return
             end
 
+            % 回到曲线页，避免用户还停在生成图上而看不到新曲线
+            app.tabGroup.SelectedTab = app.tabCurves;
+
             spec = struct();
             spec.method = app.ddlMethod.Value;
             spec.N      = app.edN.Value;
@@ -319,7 +378,7 @@ classdef QKDApp < handle
                 app.log('已有出图任务在运行，请等待完成或取消。');
                 return
             end
-            dlg = uiprogressdlg(app.UIFigure, 'Title', '一键出图', ...
+            dlg = uiprogressdlg(app.UIFigure, 'Title', '', ...
                 'Message', '准备…', 'Value', 0, ...
                 'Cancelable', 'on', 'CancelText', '取消', ...
                 'Indeterminate', 'off');
@@ -364,6 +423,7 @@ classdef QKDApp < handle
                         error('qkd:gui:badTask', '未知任务编号: %g', which);
                 end
                 ok = true;
+                app.showGenerated(which);   % 把生成结果放到右侧标签页
                 app.log(sprintf('出图完成（%.1f s）：%s', toc(t0), app.taskFiles(which)));
             catch ME
                 if strcmp(ME.identifier, 'qkd:gui:canceled')
@@ -419,6 +479,65 @@ classdef QKDApp < handle
                 otherwise
                     s = '';
             end
+        end
+
+        % ============================================================
+        % 生成图像 → 右侧标签页
+        % ============================================================
+        function showGenerated(app, which)
+            % 加载本次生成/更新的 PNG，并切到主图标签页
+            switch which
+                case 1
+                    want = app.IMG_NAMES(1);      sel = 1;
+                case 2
+                    want = app.IMG_NAMES(2:3);    sel = 2;
+                case 3
+                    want = app.IMG_NAMES(4:5);    sel = 4;
+                case 0
+                    want = app.IMG_NAMES;         sel = 4;
+                otherwise
+                    return
+            end
+
+            dirRes = app.resultsDir();
+            for k = 1:numel(want)
+                idx  = find(strcmp(app.IMG_NAMES, want{k}), 1);
+                path = fullfile(dirRes, [want{k} '.png']);
+                if ~isempty(idx) && exist(path, 'file')
+                    app.showImage(idx, path);
+                end
+            end
+            app.tabGroup.SelectedTab = app.imgTabs{sel};
+        end
+
+        function showImage(app, k, path)
+            % 读 PNG → 画到对应标签页（不依赖图像处理工具箱）
+            ax = app.imgAxes{k};
+            try
+                img = imread(path);
+            catch
+                return
+            end
+            if max(size(img, 1), size(img, 2)) > 1600
+                % 300 dpi 出图较大，隔点降采样即可，显示质量不受影响
+                if ndims(img) == 3
+                    img = img(1:2:end, 1:2:end, :);
+                else
+                    img = img(1:2:end, 1:2:end);
+                end
+            end
+            cla(ax);
+            image(ax, img);
+            ax.XTick = [];  ax.YTick = [];
+            ax.XLim  = [0.5, size(img, 2) + 0.5];
+            ax.YLim  = [0.5, size(img, 1) + 0.5];
+            ax.DataAspectRatio = [1 1 1];
+            ax.Box = 'off';
+            app.imgLabels{k}.Visible = 'off';
+        end
+
+        function d = resultsDir(~)
+            d = fullfile(fileparts(which('QKDApp')), 'results');
         end
 
         % ============================================================
