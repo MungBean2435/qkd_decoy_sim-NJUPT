@@ -143,7 +143,7 @@ addpath(genpath(pwd));
 runTests
 ```
 
-### 日常提交流程
+### 提交流程
 
 ```bash
 git switch main && git pull        # 先同步别人的改动
