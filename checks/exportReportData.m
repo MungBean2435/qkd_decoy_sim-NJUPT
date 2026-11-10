@@ -12,7 +12,7 @@ function exportReportData()
 %   注意：若只改了 run_task3 里的优化设置（npop/ngen），本检查发现不了，
 %   请重新跑一次 run_task3 再导出。
 
-root = fileparts(mfilename('fullpath'));
+root = projectRoot();
 out  = fullfile(root, 'results', 'report_tables.csv');
 fid  = fopen(out, 'w', 'n', 'UTF-8');
 c    = onCleanup(@() fclose(fid));

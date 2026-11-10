@@ -1,6 +1,6 @@
 function verify()
 %VERIFY 一致性核查：优化结果不得低于对应基准，结果写入 UTF-8 日志
-fid = fopen(fullfile(fileparts(mfilename('fullpath')), 'results', 'verify.log'), 'w', 'n', 'UTF-8');
+fid = fopen(fullfile(projectRoot(), 'results', 'verify.log'), 'w', 'n', 'UTF-8');
 c = onCleanup(@() fclose(fid));
 
 p = qkd.params();

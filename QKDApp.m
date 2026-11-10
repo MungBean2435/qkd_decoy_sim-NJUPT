@@ -537,7 +537,9 @@ classdef QKDApp < handle
         end
 
         function d = resultsDir(~)
-            d = fullfile(fileparts(which('QKDApp')), 'results');
+            % 用 projectRoot() 而不是 which('QKDApp')：脚本已按目录分层，
+            % 只有仓库根才和 results/ 有固定关系
+            d = fullfile(projectRoot(), 'results');
         end
 
         % ============================================================

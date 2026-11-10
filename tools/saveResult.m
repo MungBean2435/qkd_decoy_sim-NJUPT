@@ -5,7 +5,7 @@ function outPath = saveResult(fig, name, out)
 %   name : 文件名（不含扩展名），如 'fig1_gauss_N'
 %   out  : qkd.runCase 的返回值（需含 L, R 等字段）
 
-root    = fileparts(mfilename('fullpath'));
+root    = projectRoot();       % 本文件在 tools/ 下，仓库根要单独解析
 resDir  = fullfile(root, 'results');
 if ~exist(resDir, 'dir'), mkdir(resDir); end
 
