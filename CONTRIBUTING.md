@@ -10,7 +10,7 @@
 
 ```bash
 git clone https://github.com/MungBean2435/qkd_decoy_sim-NJUPT.git
-cd qkd_decoy_sim
+cd qkd_decoy_sim-NJUPT
 ```
 
 MATLAB 里：
@@ -52,8 +52,29 @@ test(runTests): 更新高斯金标准
    - 再更新金标准，并在 PR 描述里写：改了什么、为什么、对应指导书哪条式子。
 
 3. **三种起伏方法共用同一条估计链**
-   新增方法 = 在 [`+qkd/fluct.m`](../+qkd/fluct.m) 里加一个 `case`，
+   新增方法 = 在 [`+qkd/fluct.m`](+qkd/fluct.m) 里加一个 `case`，
    实现 `D.Q` / `D.T` / `D.Y0` 三个偏差函数即可，`estimate.m` 不用动。
+
+## 文件该放哪里
+
+脚本按职责分目录，**不要往根目录丢新文件**：
+
+| 目录 | 放什么 | 典型文件 |
+| --- | --- | --- |
+| `+qkd/` | 物理公式与计算入口，不含任何绘图 | `params.m`、`runCase.m` |
+| `tasks/` | 题目要求的出图脚本 | `run_task1/2/3.m` |
+| `tools/` | 可复用的绘图/存盘工具 | `newFig.m`、`saveResult.m`、`cjkFont.m` |
+| `checks/` | 自检、核查、报告导出 | `runTests.m`、`verify.m` |
+
+根目录只保留 `launch.m`、`QKDApp.m`、`projectRoot.m` 和 `+qkd/`。
+
+**不要**再用 `fileparts(mfilename('fullpath'))` 当仓库根 —— 子目录里的脚本会得到子目录本身。
+需要拼 `results/` 之类路径时统一用 `projectRoot()`：
+
+```matlab
+root = projectRoot();
+out  = fullfile(root, 'results', 'fig1.png');
+```
 
 ## 提交 PR 前
 

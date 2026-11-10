@@ -10,7 +10,7 @@ function ok = runTests()
 %   改动物理模型时这些数字必然变化——那是有意修改，
 %   请同时更新本文的金标准，并在 PR 里说明物理依据。
 
-root = fileparts(mfilename('fullpath'));
+root = projectRoot();          % 本文件在 checks/ 下，仓库根要单独解析
 addpath(genpath(root));
 
 p  = qkd.params();

@@ -4,7 +4,7 @@ function smokeGUI()
 %   用途：在没有人工点击的情况下验证界面能正常构建、回调能跑通。
 %   运行： addpath(genpath('qkd_decoy_sim')); smokeGUI
 
-root = fileparts(mfilename('fullpath'));
+root = projectRoot();          % 本文件在 checks/ 下，仓库根要单独解析
 app  = QKDApp();
 app.UIFigure.Visible = 'off';
 

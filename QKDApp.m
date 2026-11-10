@@ -170,7 +170,7 @@ classdef QKDApp < handle
             app.btnTask3 = uibutton(pnlTask, 'Text', '任务3：全局优化', ...
                 'Position', [8 22 190 32], 'FontName', cjkFont(), 'FontSize', 10, ...
                 'ButtonPushedFcn', @(~, ~) app.runTaskBatch(3), ...
-                'Tooltip', 'run_task3：生成 fig3_chernoff_global 与 fig3b_optimal_params（约 1 分钟）');
+                'Tooltip', 'run_task3：生成 fig3_chernoff_global 与 fig3b_optimal_params（约 10 秒）');
             app.btnTaskAll = uibutton(pnlTask, 'Text', '一键全部（1 → 2 → 3）', ...
                 'Position', [212 22 190 32], 'FontName', cjkFont(), 'FontSize', 10, ...
                 'FontWeight', 'bold', 'BackgroundColor', [0.20 0.50 0.85], ...
@@ -414,11 +414,11 @@ classdef QKDApp < handle
                     case 3
                         run_task3(app.taskOpt(progressFcn, [0 1]));
                     case 0
-                        % 按实测耗时加权：任务1/2 不到 1 s，任务3 约 1 分钟
+                        % 按实测耗时加权：任务1≈2.3 s、任务2≈2.8 s、任务3≈7 s
                         app.log('一键出图：按题目默认参数依次生成任务1、2、3（表格编辑不影响出图）。');
-                        run_task1(app.taskOpt(progressFcn, [0.00 0.02]));
-                        run_task2(app.taskOpt(progressFcn, [0.02 0.10]));
-                        run_task3(app.taskOpt(progressFcn, [0.10 1.00]));
+                        run_task1(app.taskOpt(progressFcn, [0.00 0.19]));
+                        run_task2(app.taskOpt(progressFcn, [0.19 0.42]));
+                        run_task3(app.taskOpt(progressFcn, [0.42 1.00]));
                     otherwise
                         error('qkd:gui:badTask', '未知任务编号: %g', which);
                 end
@@ -537,7 +537,9 @@ classdef QKDApp < handle
         end
 
         function d = resultsDir(~)
-            d = fullfile(fileparts(which('QKDApp')), 'results');
+            % 用 projectRoot() 而不是 which('QKDApp')：脚本已按目录分层，
+            % 只有仓库根才和 results/ 有固定关系
+            d = fullfile(projectRoot(), 'results');
         end
 
         % ============================================================

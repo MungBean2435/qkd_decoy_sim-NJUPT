@@ -12,6 +12,7 @@ function out = runCase(p, spec)
 %           .opt     'none' | 'u' | 'global'
 %           .optU    （opt='u' 时）结构体：.lb .ub .n .mode('perDistance'|'fixed')
 %           .optG    （opt='global' 时）结构体：.npop .ngen
+%                    .strideL 粗网格步长（km，默认 5；1 表示逐点全优化）
 %
 %   out : .L .R .u .v .Pu .Pv .Lmax .method .N .opt .spec .p
 %
@@ -88,16 +89,72 @@ switch lower(spec.opt)
         if ~isfield(spec, 'optG') || isempty(spec.optG)
             spec.optG = struct('npop', 40, 'ngen', 60);
         end
-        for i = 1:n
-            [xb, fb] = optimizeGlobal(p, L(i), spec, spec.optG);
-            out.R(i)  = fb;
-            out.u(i)  = xb(1);                 % u
-            out.v(i)  = xb(1) * xb(2);         % v = u * ratio
-            out.Pu(i) = xb(3);                 % P_u
-            out.Pv(i) = xb(4);                 % P_v
+        gopt = spec.optG;
+
+        % 粗网格步长（km），默认 5。全局优化的单点代价约为普通扫描的千倍，
+        % 而相邻距离点的最优参数几乎是连续的，逐公里优化的边际收益极小；
+        % 因此在粗网格上优化，再把“最优参数”插值回细网格重新求 R。
+        % 注意插值的是参数、不是 R：每个细点仍用真实参数真算一次密钥率，
+        % 只是这些参数对该点未必最优，所以曲线略偏保守。
+        if ~isfield(gopt, 'strideL') || isempty(gopt.strideL)
+            gopt.strideL = 5;
+        end
+        stepIdx = max(1, round(gopt.strideL / spec.L(3)));
+        idxC    = unique([1:stepIdx:n, n]);
+        nc      = numel(idxC);
+
+        Xu = nan(1, nc);  Xv  = nan(1, nc);
+        XPu = nan(1, nc); XPv = nan(1, nc);
+        Rc  = zeros(1, nc);
+        for j = 1:nc
+            i = idxC(j);
+            [xb, fb] = optimizeGlobal(p, L(i), spec, gopt);
+            Xu(j)  = xb(1);                 % u
+            Xv(j)  = xb(1) * xb(2);         % v = u * ratio
+            XPu(j) = xb(3);                 % P_u
+            XPv(j) = xb(4);                 % P_v
+            Rc(j)  = fb;
             % 全局优化单点耗时远高于扫描，逐点上报以保证取消足够及时
-            notifyProgress(spec, i / n, ...
-                sprintf('全局优化 (u, v, P_u, P_v)：L = %.0f km（%d/%d）', L(i), i, n));
+            notifyProgress(spec, j / nc, ...
+                sprintf('全局优化 (u, v, P_u, P_v)：L = %.0f km（%d/%d）', L(i), j, nc));
+        end
+
+        if nc == 1
+            % 单点规格（如自检里的 L=[100 100 1]）：整段沿用同一组参数后重算
+            out.u  = Xu  * ones(1, n);
+            out.v  = Xv  * ones(1, n);
+            out.Pu = XPu * ones(1, n);
+            out.Pv = XPv * ones(1, n);
+            out.R  = rateFor(p, L, spec, out.u, out.v, out.Pu, out.Pv);
+        else
+            % 只在“确实有正密钥”的粗点上插值；grid 之外保持 NaN（→ R = 0）
+            good = isfinite(Xu) & isfinite(Xv) & isfinite(XPu) & isfinite(XPv) & (Rc > 0);
+            if nnz(good) < 2
+                out.R = zeros(1, n);
+            else
+                Lg = L(idxC(good));
+                out.u  = interp1(Lg, Xu(good),  L, 'linear', NaN);
+                out.v  = interp1(Lg, Xv(good),  L, 'linear', NaN);
+                out.Pu = interp1(Lg, XPu(good), L, 'linear', NaN);
+                out.Pv = interp1(Lg, XPv(good), L, 'linear', NaN);
+                out.R  = rateFor(p, L, spec, out.u, out.v, out.Pu, out.Pv);
+
+                % 断崖附近按原网格补优化：粗网格会把最后不足 strideL 公里的
+                % 成码区截掉，这里把“最后一个有密钥的粗点”到“下一个粗点”
+                % 之间的细点补算回来，保证 Lmax 仍是原网格分辨率
+                kl = find(Rc > 0, 1, 'last');
+                if ~isempty(kl) && kl < nc
+                    for i = idxC(kl) + 1 : idxC(kl + 1) - 1
+                        [xb, fb] = optimizeGlobal(p, L(i), spec, gopt);
+                        out.u(i)  = xb(1);
+                        out.v(i)  = xb(1) * xb(2);
+                        out.Pu(i) = xb(3);
+                        out.Pv(i) = xb(4);
+                        out.R(i)  = fb;
+                    end
+                    notifyProgress(spec, 1, '断崖区已按原网格细化');
+                end
+            end
         end
 
     otherwise
@@ -150,30 +207,40 @@ R(~isfinite(R)) = 0;
 end
 
 function [xb, fb] = optimizeGlobal(p, L, spec, opt)
-% 带边界约束的差分进化（最大化密钥率）
+% 带边界约束的差分进化（最大化密钥率），按“整代”批量评估
 lb  = [ 0.10,  0.02, 0.05, 0.02];
 ub  = [ 1.40,  0.90, 0.90, 0.90];
 Dm  = numel(lb);
 rng(20260101);                      % 固定随机种子，保证结果可复现
 
-pop = lb + rand(opt.npop, Dm) .* (ub - lb);
-fit = objFun(p, L, spec, pop);
+npop = opt.npop;
+pop  = lb + rand(npop, Dm) .* (ub - lb);
+fit  = objFun(p, L, spec, pop);
 
+idx = zeros(npop, 3);
 for g = 1:opt.ngen
-    for i = 1:opt.npop
-        idx = randperm(opt.npop, 3);
-        mut = pop(idx(1), :) + 0.6 * (pop(idx(2), :) - pop(idx(3), :));
-        mut = min(max(mut, lb), ub);
-        cross = rand(1, Dm) < 0.7;
-        cross(randi(Dm)) = true;
-        trial = pop(i, :);
-        trial(cross) = mut(cross);
-        ft = objFun(p, L, spec, trial);
-        if ft > fit(i)
-            pop(i, :) = trial;
-            fit(i) = ft;
-        end
+    % 每个个体抽 3 个互不相同的下标（纯随机数运算，不涉及内核调用）
+    for i = 1:npop
+        idx(i, :) = randperm(npop, 3);
     end
+
+    % 整代一次构造出所有 trial
+    mut = pop(idx(:, 1), :) + 0.6 * (pop(idx(:, 2), :) - pop(idx(:, 3), :));
+    mut = min(max(mut, lb), ub);
+
+    cross = rand(npop, Dm) < 0.7;
+    cross(sub2ind([npop, Dm], (1:npop)', randi(Dm, npop, 1))) = true;
+
+    trial = pop;
+    trial(cross) = mut(cross);
+
+    % 整代一次评估：objFun 本就支持 N×4 矩阵，npop 个候选只走一次
+    % keyRateAt，把每次调用的固定开销摊薄（原来是个体逐个调用）
+    ft = objFun(p, L, spec, trial);
+
+    better = ft > fit;
+    pop(better, :) = trial(better, :);
+    fit(better)    = ft(better);
 end
 
 [fb, k] = max(fit);

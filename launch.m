@@ -5,7 +5,7 @@ function app = launch()
 %       launch
 %   或在本目录执行
 %       addpath('..'); launch
-root = fileparts(mfilename('fullpath'));
+root = projectRoot();
 addpath(genpath(root));
 app  = QKDApp();
 end
