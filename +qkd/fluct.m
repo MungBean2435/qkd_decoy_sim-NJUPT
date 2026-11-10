@@ -20,6 +20,17 @@ if nargin < 2 || isempty(eps)
     eps = 1e-7;
 end
 
+% ---- 缓存（与 cjkFont.m 的 persistent 用法一致）----
+% estimate.m 每算一个距离点都会调一次本函数，而 method 与 eps 在一条曲线内
+% 恒定，所以单槽缓存即可命中几乎全部调用，省掉每次重建 struct 与 3 个句柄。
+% 句柄在创建时按值捕获 gamma/k/eps，缓存副本与新建副本行为完全一致。
+persistent cacheKey cacheD
+key = sprintf('%s|%.17g', lower(method), eps);
+if ~isempty(cacheKey) && strcmp(cacheKey, key)
+    D = cacheD;
+    return
+end
+
 D.eps    = eps;
 D.method = lower(method);
 
@@ -53,6 +64,10 @@ switch D.method
     otherwise
         error('qkd:fluct:badMethod', '未知统计起伏方法: %s', method);
 end
+
+% 构建成功后入槽；出错路径不入槽，避免把半个 D 留给下一次调用
+cacheKey = key;
+cacheD   = D;
 
 end
 
