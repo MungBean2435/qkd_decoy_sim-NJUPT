@@ -41,7 +41,7 @@
 % 在仓库根目录
 addpath(genpath(pwd));
 
-launch          % 打开图形界面（改参数 → 运行 → 叠加多条曲线 → 导出 PNG）
+launch          % 打开图形界面：改参数 → 运行并叠加曲线 → 左下角一键出图 → 导出 PNG
 runTests        % 回归自检，全 PASS 说明计算链正常
 ```
 
@@ -57,7 +57,7 @@ exportReportData % 报告用数值表 results/report_tables.csv
 
 ### 中文字体
 
-图中所有中文标注都通过 [cjkFont.m](cjkFont.m) 取字体名，按平台依次探测：
+图中所有中文标注都通过 [tools/cjkFont.m](tools/cjkFont.m) 取字体名，按平台依次探测：
 Windows 用 `Microsoft YaHei`，macOS 用 `PingFang SC`，Linux 用 `Noto Sans CJK` 或 `WenQuanYi`。
 
 探测不到任何中文字体时会退回 `Helvetica`。**这一情形下代码仍能正常跑完、不会抛异常，
@@ -112,17 +112,31 @@ qkd_decoy_sim/
 │   └── runCase.m         #   统一入口：扫描距离 / 优化 u / 全局优化
 ├── QKDApp.m              # GUI（纯代码 uifigure，无 .mlapp）
 ├── launch.m              # 一键启动 GUI
-├── run_task1/2/3.m       # 三个任务的出图脚本（只调内核 + 画图）
-├── newFig.m saveResult.m # 出图与存盘工具
-├── cjkFont.m             # 跨平台中文字体探测
-├── runTests.m            # 回归自检（CI 调用）
-├── selfTest.m verify.m smokeGUI.m exportReportData.m
+├── projectRoot.m         # 定位仓库根（子目录里的脚本都靠它拼 results/ 路径）
+├── tasks/                # 三个任务的出图脚本（只调内核 + 画图）
+│   └── run_task1/2/3.m
+├── tools/                # 通用出图与存盘工具
+│   ├── newFig.m          #   统一图窗风格（白底 / 中文字体 / 对数纵轴）
+│   ├── saveResult.m      #   PNG 300dpi + .fig + CSV 三件套
+│   └── cjkFont.m         #   跨平台中文字体探测
+├── checks/               # 自检、核查与报告导出
+│   ├── runTests.m        #   回归自检（CI 调用）
+│   ├── selfTest.m        #   打印关键数值的体检
+│   ├── verify.m          #   一致性核查 → results/verify.log
+│   ├── smokeGUI.m        #   GUI 无头自检
+│   └── exportReportData.m#   报告数值表 → results/report_tables.csv
 ├── results/              # 生成的 PNG + CSV（.fig 已忽略）
 └── .github/workflows/    # CI
 ```
 
-**分层约定**：`+qkd/` 不含任何绘图代码；`QKDApp.m` 与 `run_task*.m` 不含任何物理公式。
-新增方法 = 在 `fluct.m` 加一个分支，其余代码不动。
+**分层约定**：
+
+- 只有 `+qkd/` 允许出现物理公式；`tasks/`、`QKDApp.m` 只收集参数、调 `qkd.runCase`、画图。
+- 新增方法 = 在 [`+qkd/fluct.m`](+qkd/fluct.m) 加一个 `case`，其余代码不动。
+- 脚本按职责归入 `tasks/`（出图）、`tools/`（可复用工具）、`checks/`（自检与导出），
+  不要把一次性脚本丢在根目录。
+- 子目录里的脚本**不要**用 `fileparts(mfilename('fullpath'))` 当仓库根 —— 那会得到子目录。
+  统一用 [`projectRoot()`](projectRoot.m) 拼 `results/` 等路径。
 
 ## 五、协作
 
@@ -132,7 +146,7 @@ qkd_decoy_sim/
 
 ```bash
 git clone https://github.com/MungBean2435/qkd_decoy_sim-NJUPT.git
-cd qkd_decoy_sim
+cd qkd_decoy_sim-NJUPT
 git config core.autocrlf input      # 建议，避免换行符制造整文件 diff
 ```
 
@@ -193,6 +207,22 @@ git config --get core.autocrlf     # 建议 input 或 false
   重新求密钥率（插值的是参数而不是曲线，因此每个点都是真算出来的），断崖附近另按原网格逐个
   补优化以保住 $L_{\max}$ 的分辨率。粗网格步长可用 `spec.optG.strideL` 调整，设为 1 即逐点全优化。
 
+### 性能参考
+
+在 i7 笔记本 + MATLAB R2020a 上的一次完整流程（回归 + 三张图 + 数值表 + 核查）：
+
+| 步骤 | 耗时 | 说明 |
+| --- | ---: | --- |
+| `runTests` | 0.2 s | 18 项断言只取少量距离点，几乎不花时间 |
+| `run_task1` | 2.9 s | 计算可忽略，主要是 300 dpi 出图 |
+| `run_task2` | 3.0 s | 同上（两张图） |
+| `run_task3` | 3.8 s | 计算约 0.7 s，其余是出图 |
+| `exportReportData` | 0.2 s | 复用图3 已生成的 CSV，不重算全局优化 |
+| `verify` | 0.1 s | |
+| **合计** | **约 10 s** | 优化前为 52 s |
+
+瓶颈已从「优化算法」转到「300 dpi 出图」；想更快可以关掉 `saveResult` 里的 `savefig(.fig)`。
+
 ## 七、许可
 
 [MIT](LICENSE)
@@ -215,7 +245,7 @@ runTests    % regression checks
 run_task1   % figures + CSV into results/
 ```
 
-Chinese labels are drawn with a font picked by [cjkFont.m](cjkFont.m)
+Chinese labels are drawn with a font picked by [tools/cjkFont.m](tools/cjkFont.m)
 (`Microsoft YaHei` / `PingFang SC` / `Noto Sans CJK`). If no CJK font is
 installed the code still runs to completion, but Chinese text renders as
 boxes; on Linux install `fonts-noto-cjk` first.
