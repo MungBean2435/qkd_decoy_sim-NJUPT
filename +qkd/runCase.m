@@ -1,38 +1,60 @@
 function out = runCase(p, spec)
-%RUNCASE 一条密钥率曲线的统一入口（GUI 与脚本都只调用本函数）
+%RUNCASE 画一条密钥率曲线：从这里进，往下一路算到 R(L)（GUI 和脚本都走这一个门）
 %
 %   out = qkd.runCase(p, spec)
 %
-%   p     : qkd.params() 返回的参数结构体（可被外部改写后传入）
-%   spec  : 计算规格
-%           .method  'gauss' | 'hoeffding' | 'chernoff'
-%           .N       发射脉冲数
-%           .eps     失败概率（默认 1e-7）
-%           .L       [起点 终点 步长]，单位 km
+% ------------------------------------------------------------------------
+%  这个文件在工程里的角色：「总调度」。
+%
+%  上面一层（GUI 的按钮、tasks 里的脚本）把「想算什么」写成一个 spec 交进来，
+%  这一层负责按距离一个个算，把结果凑成一条曲线还给上面。
+%  它自己不含物理公式 —— 公式都在 estimate.m / keyRateAt.m 里。
+%
+%  三种工作模式，对应三个题目：
+%     opt='none'    参数全固定，只扫距离          → 任务 1 的基线
+%     opt='u'       只调信号态光强 u              → 任务 2
+%     opt='global'  四个参数 (u,v,Pu,Pv) 一起调   → 任务 3
+% ------------------------------------------------------------------------
+%
+%  输入
+%     p    : qkd.params() 给的参数表（调用方可以改里面的字段再传进来）
+%     spec : 「算什么的说明书」，字段如下
+%           .method  'gauss' | 'hoeffding' | 'chernoff'   用哪种统计界
+%           .N       发射脉冲数（1e8 ~ 1e10）
+%           .eps     说错的概率（默认 1e-7）
+%           .L       [起点 终点 步长]，单位 km，例如 [0 300 1]
 %           .opt     'none' | 'u' | 'global'
-%           .optU    （opt='u' 时）结构体：.lb .ub .n .mode('perDistance'|'fixed')
-%           .optG    （opt='global' 时）结构体：.npop .ngen
-%                    .strideL 粗网格步长（km，默认 5；1 表示逐点全优化）
+%           .optU    （只有 opt='u' 用）结构体：.lb .ub .n .mode('perDistance'|'fixed')
+%           .optG    （只有 opt='global' 用）结构体：.npop .ngen
+%                    .strideL 粗网格步长（km，默认 5；设成 1 就是逐点全优化）
+%           .onProgress  可选，进度回调（GUI 用它更新进度条）
 %
-%   out : .L .R .u .v .Pu .Pv .Lmax .method .N .opt .spec .p
+%  输出 out
+%           .L .R        距离数组和对应的密钥率
+%           .u .v .Pu .Pv 每个距离点实际用的（或优化出来的）参数
+%           .Lmax        最远成码距离：最后一个 R>0 的点
+%           .method .N .opt .spec .p   把输入原样带出来，方便画图时写标题
 %
-%   本函数是“计算内核”与“界面/绘图”之间唯一的接口：
-%   GUI 只是收集 spec → 调用 runCase → 画 out，不含任何物理公式。
+%  一句话记住这个文件：它是「计算内核」和「画图/界面」之间唯一的接口。
+% ------------------------------------------------------------------------
 
+% 两个默认值：调用方懒得写的时候就按这个来（MATLAB 里很常见的写法）
 if ~isfield(spec, 'eps') || isempty(spec.eps), spec.eps = 1e-7; end
 if ~isfield(spec, 'opt') || isempty(spec.opt), spec.opt = 'none'; end
 
+% 把 [起点 终点 步长] 展开成一系列距离点，比如 [0 300 1] → 0,1,2,...,300（共 301 个）
 L = spec.L(1) : spec.L(3) : spec.L(2);
-n = numel(L);
+n = numel(L);      % 一共要算多少个距离点
 
-% 进度回调采样步长：逐点扫描时最多刷新约 50 次，避免界面被回调拖慢。
-% spec.onProgress 为可选字段：命令行调用不传时行为与本函数原实现完全一致。
+% 进度回调的刷新间隔：算 301 个点没必要回报 301 次，最多回报约 50 次就够了，
+% 否则光刷新界面就把时间耗光了（这是「别让上报拖慢计算」的常识）。
 stride = max(1, floor(n / 50));
 
+% 先把输出结构体铺好：默认「参数不变」，后面优化器算出来的值再往里覆盖。
 out = struct();
 out.L   = L;
 out.R   = zeros(1, n);
-out.u   = p.u * ones(1, n);
+out.u   = p.u * ones(1, n);    % ones(1,n) 是 n 个 1，乘上 p.u 就得到整行相同的值
 out.v   = p.v * ones(1, n);
 out.Pu  = p.Pu * ones(1, n);
 out.Pv  = p.Pv * ones(1, n);
@@ -40,15 +62,18 @@ out.method = spec.method;
 out.N   = spec.N;
 out.eps = spec.eps;
 out.opt = spec.opt;
-out.spec = spec;
+out.spec = spec;    % 原样存一份说明书，画图时要读里面的设置
 out.p    = p;
 
+% 按模式分三路走
 switch lower(spec.opt)
 
     case 'none'
-        % 固定参数，仅扫描距离
+        % ============ 模式一：参数全固定，只扫距离（任务 1）============
+        % 最朴素的做法：一个一个距离点算过去。
         for i = 1:n
             out.R(i) = rateFor(p, L(i), spec, p.u, p.v, p.Pu, p.Pv);
+            % 到第 1 个、最后一个、或者每隔 stride 个，回报一次进度
             if i == 1 || i == n || mod(i, stride) == 0
                 notifyProgress(spec, i / n, ...
                     sprintf('扫描距离 L = %.0f km（%d/%d）', L(i), i, n));
@@ -56,28 +81,34 @@ switch lower(spec.opt)
         end
 
     case 'u'
-        % 只优化信号态光强 u（v、P_u、P_v 固定）
+        % ============ 模式二：只优化信号态光强 u（任务 2）============
+        % v、P_u、P_v 保持题目给定值，只问「这个距离上 u 取多少最好」。
+        % linspace 造出一串候选：lb 到 ub 之间均匀取 n 个，例如 0.10~1.30 取 61 个。
         ug = linspace(spec.optU.lb, spec.optU.ub, spec.optU.n);
 
         if strcmpi(spec.optU.mode, 'perDistance')
-            % 逐距离最优：每个距离点各自取使 R 最大的 u
+            % 逐距离最优：每个距离点各挑各的 u。
+            % 好处是这条曲线代表「该方法在最好情况下的性能」，也就是性能上限。
             for i = 1:n
+                % 一次把 61 个候选全算出来（向量化的威力：只调一次内核）
                 Rv = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
-                [rmax, k] = max(Rv);
+                [rmax, k] = max(Rv);   % 挑最大那个，k 是它在候选里的位置
                 out.R(i) = rmax;
-                out.u(i) = ug(k);
+                out.u(i) = ug(k);      % 记住这个距离点用的是哪个 u
                 if i == 1 || i == n || mod(i, stride) == 0
                     notifyProgress(spec, i / n, ...
                         sprintf('逐距离优化 u：L = %.0f km（%d/%d）', L(i), i, n));
                 end
             end
         else
-            % 整段统一：一个 u 用到底，取使最远成码距离最大的 u
+            % 整段统一：一个 u 用到底（实际系统里工作点往往不随距离改，
+            % 所以这个模式更「工程化」，但性能不如逐距离优化）。
             notifyProgress(spec, 0, sprintf('固定 u 批量扫描（%d 个候选）…', numel(ug)));
-            Rm = zeros(numel(ug), n);
+            Rm = zeros(numel(ug), n);      % 每一行是一个候选 u，每一列是一个距离
             for i = 1:n
                 Rm(:, i) = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
             end
+            % 判据：哪个 u 能让「有密钥的距离点最多」（即传得最远）就选哪个
             [~, uIdx] = max(sum(Rm > 0, 2));
             out.R = Rm(uIdx, :);
             out.u = ug(uIdx) * ones(1, n);
@@ -85,63 +116,71 @@ switch lower(spec.opt)
         end
 
     case 'global'
-        % 联合优化 (u, v, P_u, P_v)
+        % ============ 模式三：四个参数一起优化（任务 3）============
+        % 联合优化 (u, v, P_u, P_v)。注意这里没有解析解，只能靠搜索算法。
         if ~isfield(spec, 'optG') || isempty(spec.optG)
-            spec.optG = struct('npop', 40, 'ngen', 60);
+            spec.optG = struct('npop', 40, 'ngen', 60);   % 种群大小、迭代代数
         end
         gopt = spec.optG;
 
-        % 粗网格步长（km），默认 5。全局优化的单点代价约为普通扫描的千倍，
-        % 而相邻距离点的最优参数几乎是连续的，逐公里优化的边际收益极小；
-        % 因此在粗网格上优化，再把“最优参数”插值回细网格重新求 R。
-        % 注意插值的是参数、不是 R：每个细点仍用真实参数真算一次密钥率，
-        % 只是这些参数对该点未必最优，所以曲线略偏保守。
+        % 粗网格步长（km），默认 5。
+        % 为什么要粗？全局优化「一个距离点」就要跑几百次内核，代价约是普通扫描的千倍。
+        % 而相邻距离点的最优参数几乎连成一条平滑曲线，每 5 km 算一次完全够用。
         if ~isfield(gopt, 'strideL') || isempty(gopt.strideL)
             gopt.strideL = 5;
         end
-        stepIdx = max(1, round(gopt.strideL / spec.L(3)));
-        idxC    = unique([1:stepIdx:n, n]);
+        stepIdx = max(1, round(gopt.strideL / spec.L(3)));   % 5 km / 1 km = 每隔 5 个点
+        idxC    = unique([1:stepIdx:n, n]);                  % 粗网格点的下标（保证带上最后一个点）
         nc      = numel(idxC);
 
+        % 先准备好容器，装每个粗网格点优化出来的四个参数和对应的密钥率
         Xu = nan(1, nc);  Xv  = nan(1, nc);
         XPu = nan(1, nc); XPv = nan(1, nc);
         Rc  = zeros(1, nc);
         for j = 1:nc
             i = idxC(j);
+            % 交给下面的 optimizeGlobal 去做差分进化搜索
             [xb, fb] = optimizeGlobal(p, L(i), spec, gopt);
             Xu(j)  = xb(1);                 % u
-            Xv(j)  = xb(1) * xb(2);         % v = u * ratio
+            Xv(j)  = xb(1) * xb(2);         % v = u × 比值（优化器内部用比值，见 objFun）
             XPu(j) = xb(3);                 % P_u
             XPv(j) = xb(4);                 % P_v
-            Rc(j)  = fb;
-            % 全局优化单点耗时远高于扫描，逐点上报以保证取消足够及时
+            Rc(j)  = fb;                    % 这个点能到的最优密钥率
+            % 全局优化很慢，所以每算完一个点就报一次进度，用户点「取消」才能及时生效
             notifyProgress(spec, j / nc, ...
                 sprintf('全局优化 (u, v, P_u, P_v)：L = %.0f km（%d/%d）', L(i), j, nc));
         end
 
         if nc == 1
-            % 单点规格（如自检里的 L=[100 100 1]）：整段沿用同一组参数后重算
+            % 只有一个点（自检里常这么用，比如 L=[100 100 1]）：
+            % 就把优化出来的这组参数铺到整条曲线上重算一遍。
             out.u  = Xu  * ones(1, n);
             out.v  = Xv  * ones(1, n);
             out.Pu = XPu * ones(1, n);
             out.Pv = XPv * ones(1, n);
             out.R  = rateFor(p, L, spec, out.u, out.v, out.Pu, out.Pv);
         else
-            % 只在“确实有正密钥”的粗点上插值；grid 之外保持 NaN（→ R = 0）
+            % 只有「确实算出了正密钥」的粗点才拿来插值；
+            % 已经没密钥的区域（R=0 或参数是 NaN）不参与，避免把曲线插到不该去的地方。
             good = isfinite(Xu) & isfinite(Xv) & isfinite(XPu) & isfinite(XPv) & (Rc > 0);
             if nnz(good) < 2
+                % 有密钥的点不足 2 个，根本连不成线，整条曲线按「无密钥」处理
                 out.R = zeros(1, n);
             else
                 Lg = L(idxC(good));
+                % 关键技巧：插值的是「参数」，不是曲线！
+                % 把粗网格上求出的最优 u,v,Pu,Pv 插值到每个 1 km 点上，
+                % 然后逐个点重新算 R。这样每个细点都是真算出来的，
+                % 只是因为参数未必对该点最优，所以结果略偏保守（宁可低估）。
                 out.u  = interp1(Lg, Xu(good),  L, 'linear', NaN);
                 out.v  = interp1(Lg, Xv(good),  L, 'linear', NaN);
                 out.Pu = interp1(Lg, XPu(good), L, 'linear', NaN);
                 out.Pv = interp1(Lg, XPv(good), L, 'linear', NaN);
                 out.R  = rateFor(p, L, spec, out.u, out.v, out.Pu, out.Pv);
 
-                % 断崖附近按原网格补优化：粗网格会把最后不足 strideL 公里的
-                % 成码区截掉，这里把“最后一个有密钥的粗点”到“下一个粗点”
-                % 之间的细点补算回来，保证 Lmax 仍是原网格分辨率
+                % 补救：曲线在远处会「断崖式」归零。粗网格每 5 km 才有一个点，
+                % 可能把最后不足 5 km 的成码区整段漏掉，让 Lmax 少算几公里。
+                % 所以把「最后一个有密钥的粗点」到「下一个粗点」之间逐点补算一遍。
                 kl = find(Rc > 0, 1, 'last');
                 if ~isempty(kl) && kl < nc
                     for i = idxC(kl) + 1 : idxC(kl + 1) - 1
@@ -161,17 +200,20 @@ switch lower(spec.opt)
         error('qkd:runCase:badOpt', '未知优化模式: %s', spec.opt);
 end
 
-% 无密钥区（R = 0）不给出“最优参数”，置 NaN 以免图上出现无意义的跳变
+% 收尾一：没有密钥的地方（R<=0）不要给「最优参数」。
+% 因为那边根本不存在最优，硬画出来会让参数曲线出现无意义的跳变，
+% 所以统一置成 NaN，画图时自然断掉（这是「别让图说谎」的小细节）。
 if ~strcmpi(out.opt, 'none')
     dead = out.R <= 0;
     out.u(dead)  = NaN;   out.v(dead)  = NaN;
     out.Pu(dead) = NaN;   out.Pv(dead) = NaN;
 end
 
-% 最远成码距离（R > 0 的最后一个距离点）
+% 收尾二：定义并算出「最远成码距离」Lmax = 最后一个还有正密钥的距离点。
+% 这是三个题目都要报的核心指标（比曲线本身更好比较）。
 idx = find(out.R > 0, 1, 'last');
 if isempty(idx)
-    out.Lmax = NaN;
+    out.Lmax = NaN;     % 全程都没密钥（参数明显不合理时才会发生）
 else
     out.Lmax = out.L(idx);
 end
@@ -179,74 +221,87 @@ end
 end
 
 % ======================================================================
-% 局部函数：参数改写 + 目标函数 + 差分进化
+% 下面是内部小函数（局部函数）：外面看不到，只在 runCase 内部用。
 % ======================================================================
 
 function R = rateFor(p, L, spec, u, v, Pu, Pv)
-% 把待优化的参数写回结构体后调用内核；u/v/Pu/Pv 可为向量（候选群）
-q = p;
+% 把「待优化的参数」写回参数表，再交给内核算密钥率。
+% 为什么这样做？因为 keyRateAt 只认参数表 p，不认「优化变量」，
+% 所以优化的本质就是：改 p → 重算 → 比较 → 再改。这个函数就是那个「改」的动作。
+q = p;          % 先复制一份，绝不污染调用方传进来的 p（重要习惯）
 q.u  = u;
 q.v  = v;
 q.Pu = Pu;
 q.Pv = Pv;
-q.P0 = 1 - Pu - Pv;
+q.P0 = 1 - Pu - Pv;    % 真空态概率要跟着一起变，否则三种强度就不归一了
 R = qkd.keyRateAt(q, L, spec);
 end
 
 function R = objFun(p, L, spec, X)
-% X 的每一行是一个候选： [u, v/u, P_u, P_v]
+% 目标函数：「给定一组参数，能得到多少密钥率」。
+% 优化器看不懂物理，它只会问这一个问题，所以这里顺手把「不合法的参数」判掉。
+% X 的每一行是一个候选：[u, v/u, P_u, P_v]
 u  = X(:, 1);
-v  = X(:, 1) .* X(:, 2);
+v  = X(:, 1) .* X(:, 2);   % 用「比值」表示 v，天然保证 v 和 u 同量级
 Pu = X(:, 3);
 Pv = X(:, 4);
 R  = rateFor(p, L, spec, u, v, Pu, Pv);
-% 物理可行性约束（不满足者直接置 0，等价于惩罚）
+% 物理可行性检查：不满足的组合直接把密钥率记成 0（等于判死刑）。
+%   v 必须比 u 小（否则 (3.28) 的分母会变号）
+%   Pu+Pv 不能超过 0.95（还得给真空态留点位置）
+%   三个概率都必须为正
 bad = (v >= u) | (Pu + Pv > 0.95) | (Pu <= 0) | (Pv <= 0) | (u <= v);
 R(bad) = 0;
-R(~isfinite(R)) = 0;
+R(~isfinite(R)) = 0;    % 计算里冒出 NaN 也一律当 0，免得把优化器带跑偏
 end
 
 function [xb, fb] = optimizeGlobal(p, L, spec, opt)
-% 带边界约束的差分进化（最大化密钥率），按“整代”批量评估
-lb  = [ 0.10,  0.02, 0.05, 0.02];
-ub  = [ 1.40,  0.90, 0.90, 0.90];
-Dm  = numel(lb);
-rng(20260101);                      % 固定随机种子，保证结果可复现
+% 差分进化（Differential Evolution）：一种「不靠导数」的搜索方法。
+% 直觉：撒一群候选点 → 让好的当模板、互相之间取差去扰动 → 好的留下、差的淘汰。
+% 为什么不用更简单的梯度法？因为目标函数既非凸又带约束，还没有解析导数。
+lb  = [ 0.10,  0.02, 0.05, 0.02];   % 下界：u, v/u, Pu, Pv
+ub  = [ 1.40,  0.90, 0.90, 0.90];   % 上界
+Dm  = numel(lb);                    % 变量个数 = 4
+rng(20260101);                      % 固定随机种子：保证每次跑出来一模一样，方便复现
 
+% 第一步：在边界内随机撒 npop 个候选（第一代种群）
 npop = opt.npop;
 pop  = lb + rand(npop, Dm) .* (ub - lb);
-fit  = objFun(p, L, spec, pop);
+fit  = objFun(p, L, spec, pop);     % 一次算完一整代（向量化，比一个个算快得多）
 
 idx = zeros(npop, 3);
-for g = 1:opt.ngen
-    % 每个个体抽 3 个互不相同的下标（纯随机数运算，不涉及内核调用）
+for g = 1:opt.ngen                   % 逐代进化
+    % 给每个个体抽 3 个「别的个体」的编号，要求互不相同
     for i = 1:npop
         idx(i, :) = randperm(npop, 3);
     end
 
-    % 整代一次构造出所有 trial
+    % 变异：拿两个个体的差去推着第三个个体走（F=0.6 是常用步长）
     mut = pop(idx(:, 1), :) + 0.6 * (pop(idx(:, 2), :) - pop(idx(:, 3), :));
-    mut = min(max(mut, lb), ub);
+    mut = min(max(mut, lb), ub);      % 越界就拉回边界
 
+    % 交叉：每个维度以 0.7 的概率采用变异结果，其余保留原样
     cross = rand(npop, Dm) < 0.7;
-    cross(sub2ind([npop, Dm], (1:npop)', randi(Dm, npop, 1))) = true;
+    cross(sub2ind([npop, Dm], (1:npop)', randi(Dm, npop, 1))) = true;  % 至少换一维
 
     trial = pop;
     trial(cross) = mut(cross);
 
-    % 整代一次评估：objFun 本就支持 N×4 矩阵，npop 个候选只走一次
-    % keyRateAt，把每次调用的固定开销摊薄（原来是个体逐个调用）
+    % 整代一次评估：objFun 本来就支持矩阵输入，npop 个候选只跑一次内核
     ft = objFun(p, L, spec, trial);
 
+    % 比父代好的才留下（这就是「进化」）
     better = ft > fit;
     pop(better, :) = trial(better, :);
     fit(better)    = ft(better);
 end
 
-[fb, k] = max(fit);
+[fb, k] = max(fit);   % 找出这一代里最好的那个
 xb = pop(k, :);
 
-% 局部细化：在当前最优点附近做坐标下降
+% 第二步：局部打磨。差分进化擅长「找到大致方向」，但不擅长「精确到小数点后三位」，
+% 所以在最优点附近做个坐标下降：逐维度左试一点右试一点，好了就挪过去，
+% 连续 30 轮都没进步就把步长减半，直到步长小到没意义为止。
 step = 0.05 * (ub - lb);
 for iter = 1:30
     improved = false;
@@ -269,16 +324,15 @@ end
 end
 
 % ======================================================================
-% 可选的进度回调（界面层通过 spec.onProgress 注入）
+% 进度回调（界面层通过 spec.onProgress 注入，命令行不传就什么也不做）
 % ======================================================================
 
 function notifyProgress(spec, frac, msg)
-%NOTIFYPROGRESS 若 spec 带 onProgress，则上报归一化进度与提示文字。
-%
-%   回调抛出的异常（例如用户取消）不在此捕获，直接向上传播，
-%   由调用方（QKDApp）识别并收尾。
+%NOTIFYPROGRESS 若 spec 带 onProgress，就上报「算到百分之几了」和一句提示。
+% 注意：这里故意不 try/catch —— 用户在界面上点「取消」时，
+% 回调会抛一个异常出来，就应该让它一路抛上去，由界面层负责收尾。
 
 if isfield(spec, 'onProgress') && ~isempty(spec.onProgress)
-    spec.onProgress(min(max(frac, 0), 1), msg);
+    spec.onProgress(min(max(frac, 0), 1), msg);   % 夹在 0~1 之间，防手滑
 end
 end
