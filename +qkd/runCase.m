@@ -1,21 +1,5 @@
-function out = runCase(p, spec)
-%RUNCASE 画一条密钥率曲线：从这里进，往下一路算到 R(L)（GUI 和脚本都走这一个门）
-%
+function out = runCase(p, spec) 
 %   out = qkd.runCase(p, spec)
-%
-% ------------------------------------------------------------------------
-%  这个文件在工程里的角色：「总调度」。
-%
-%  上面一层（GUI 的按钮、tasks 里的脚本）把「想算什么」写成一个 spec 交进来，
-%  这一层负责按距离一个个算，把结果凑成一条曲线还给上面。
-%  它自己不含物理公式 —— 公式都在 estimate.m / keyRateAt.m 里。
-%
-%  三种工作模式，对应三个题目：
-%     opt='none'    参数全固定，只扫距离          → 任务 1 的基线
-%     opt='u'       只调信号态光强 u              → 任务 2
-%     opt='global'  四个参数 (u,v,Pu,Pv) 一起调   → 任务 3
-% ------------------------------------------------------------------------
-%
 %  输入
 %     p    : qkd.params() 给的参数表（调用方可以改里面的字段再传进来）
 %     spec : 「算什么的说明书」，字段如下
@@ -34,27 +18,19 @@ function out = runCase(p, spec)
 %           .u .v .Pu .Pv 每个距离点实际用的（或优化出来的）参数
 %           .Lmax        最远成码距离：最后一个 R>0 的点
 %           .method .N .opt .spec .p   把输入原样带出来，方便画图时写标题
-%
-%  一句话记住这个文件：它是「计算内核」和「画图/界面」之间唯一的接口。
-% ------------------------------------------------------------------------
 
-% 两个默认值：调用方懒得写的时候就按这个来
 if ~isfield(spec, 'eps') || isempty(spec.eps), spec.eps = 1e-7; end
 if ~isfield(spec, 'opt') || isempty(spec.opt), spec.opt = 'none'; end
 
-% 把 [起点 终点 步长] 展开成一系列距离点，比如 [0 300 1] → 0,1,2,...,300（共 301 个）
 L = spec.L(1) : spec.L(3) : spec.L(2);
-n = numel(L);      % 一共要算多少个距离点
+n = numel(L); 
 
-% 进度回调的刷新间隔：算 301 个点没必要回报 301 次，最多回报约 50 次就够了，
-% 否则光刷新界面就把时间耗光了（这是「别让上报拖慢计算」的常识）。
 stride = max(1, floor(n / 50));
 
-% 先把输出结构体铺好：默认「参数不变」，后面优化器算出来的值再往里覆盖。
 out = struct();
 out.L   = L;
 out.R   = zeros(1, n);
-out.u   = p.u * ones(1, n);    % ones(1,n) 是 n 个 1，乘上 p.u 就得到整行相同的值
+out.u   = p.u * ones(1, n);
 out.v   = p.v * ones(1, n);
 out.Pu  = p.Pu * ones(1, n);
 out.Pv  = p.Pv * ones(1, n);
@@ -62,18 +38,15 @@ out.method = spec.method;
 out.N   = spec.N;
 out.eps = spec.eps;
 out.opt = spec.opt;
-out.spec = spec;    % 原样存一份说明书，画图时要读里面的设置
+out.spec = spec;
 out.p    = p;
 
-% 按模式分三路走
 switch lower(spec.opt)
 
     case 'none'
         % ============ 模式一：参数全固定，只扫距离（任务 1）============
-        % 最朴素的做法：一个一个距离点算过去。
         for i = 1:n
             out.R(i) = rateFor(p, L(i), spec, p.u, p.v, p.Pu, p.Pv);
-            % 到第 1 个、最后一个、或者每隔 stride 个，回报一次进度
             if i == 1 || i == n || mod(i, stride) == 0
                 notifyProgress(spec, i / n, ...
                     sprintf('扫描距离 L = %.0f km（%d/%d）', L(i), i, n));
@@ -82,37 +55,22 @@ switch lower(spec.opt)
 
     case 'u'
         % ============ 模式二：只优化信号态光强 u（任务 2）============
-        % v、P_u、P_v 保持题目给定值，只问「这个距离上 u 取多少最好」。
-        % linspace 造出一串候选：lb 到 ub 之间均匀取 n 个，例如 0.10~1.30 取 601 个。
         ug = linspace(spec.optU.lb, spec.optU.ub, spec.optU.n);
 
-        if strcmpi(spec.optU.mode, 'perDistance')
-            % 逐距离最优：每个距离点各挑各的 u。
-            % 好处是这条曲线代表「该方法在最好情况下的性能」，也就是性能上限。
+        if strcmpi(spec.optU.mode, 'perDistance')        
             for i = 1:n
-                % 一次把 601 个候选全算出来（向量化的威力：只调一次内核）
+                % 一次把 601 个候选全算出来
                 Rv = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
                 [rmax, k] = max(Rv);   % 挑最大那个，k 是它在候选里的位置
                 out.R(i) = rmax;
-                out.u(i) = ug(k);      % 记住这个距离点用的是哪个 u
+                out.u(i) = ug(k);
                 if i == 1 || i == n || mod(i, stride) == 0
                     notifyProgress(spec, i / n, ...
                         sprintf('逐距离优化 u：L = %.0f km（%d/%d）', L(i), i, n));
                 end
             end
         else
-            % 整段统一：一个 u 用到底（实际系统里工作点往往不随距离改，
-            % 所以这个模式更「工程化」，但性能不如逐距离优化）。
-            notifyProgress(spec, 0, sprintf('固定 u 批量扫描（%d 个候选）…', numel(ug)));
-            Rm = zeros(numel(ug), n);      % 每一行是一个候选 u，每一列是一个距离
-            for i = 1:n
-                Rm(:, i) = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
-            end
-            % 判据：哪个 u 能让「有密钥的距离点最多」（即传得最远）就选哪个
-            [~, uIdx] = max(sum(Rm > 0, 2));
-            out.R = Rm(uIdx, :);
-            out.u = ug(uIdx) * ones(1, n);
-            notifyProgress(spec, 1, sprintf('固定 u 扫描完成（u = %.2f）', out.u(1)));
+            error('qkd:runCase:badOptU', 'optU.mode 只能是 perDistance ');
         end
 
     case 'global'
@@ -124,8 +82,6 @@ switch lower(spec.opt)
         gopt = spec.optG;
 
         % 粗网格步长（km），默认 5。
-        % 为什么要粗？全局优化「一个距离点」就要跑几百次内核，代价约是普通扫描的千倍。
-        % 而相邻距离点的最优参数几乎连成一条平滑曲线，每 5 km 算一次完全够用。
         if ~isfield(gopt, 'strideL') || isempty(gopt.strideL)
             gopt.strideL = 5;
         end
@@ -323,14 +279,8 @@ end
 
 end
 
-% ======================================================================
-% 进度回调（界面层通过 spec.onProgress 注入，命令行不传就什么也不做）
-% ======================================================================
 
 function notifyProgress(spec, frac, msg)
-%NOTIFYPROGRESS 若 spec 带 onProgress，就上报「算到百分之几了」和一句提示。
-% 注意：这里故意不 try/catch —— 用户在界面上点「取消」时，
-% 回调会抛一个异常出来，就应该让它一路抛上去，由界面层负责收尾。
 
 if isfield(spec, 'onProgress') && ~isempty(spec.onProgress)
     spec.onProgress(min(max(frac, 0), 1), msg);   % 夹在 0~1 之间，防手滑

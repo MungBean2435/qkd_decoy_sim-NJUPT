@@ -1,0 +1,1604 @@
+% !TeX program = xelatex
+% 编译方式：XeLaTeX（推荐 Overleaf：Menu -> Compiler -> XeLaTeX）
+% 本地：xelatex 密钥率计算与数据流.tex  连续编译两次以生成目录
+\documentclass[UTF8,11pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{booktabs,longtable,array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{qkdblue}{RGB}{0,90,160}
+\definecolor{qkdgray}{RGB}{246,247,249}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=qkdblue,
+  urlcolor=qkdblue,
+  citecolor=qkdblue
+}
+
+\ctexset{
+  section/format = \Large\bfseries\color{qkdblue},
+  subsection/format = \large\bfseries\color{qkdblue!85!black},
+  subsubsection/format = \normalsize\bfseries
+}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\allowdisplaybreaks
+
+\lstset{
+  language=Matlab,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{qkdblue}\bfseries,
+  commentstyle=\color{gray!70!black},
+  stringstyle=\color{red!55!black},
+  frame=single,
+  rulecolor=\color{gray!45},
+  backgroundcolor=\color{qkdgray},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=6pt,
+  tabsize=4,
+  extendedchars=true
+}
+
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\Htwo}{H_2}
+\newcommand{\Yone}{Y_1}
+\newcommand{\eone}{e_1}
+\newcommand{\YoneZ}{Y_1^{Z,L}}
+\newcommand{\eoneX}{e_1^{X,U}}
+
+\newenvironment{note}
+  {\begin{quote}\noindent\textbf{注意：}}
+  {\end{quote}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 三强度诱骗态 BB84 密钥率计算}
+\fancyhead[R]{\small\leftmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\bfseries 三强度诱骗态 BB84 密钥率计算\\[6pt]
+       \large 需要什么、数据怎么得来、怎么流动}
+\author{\code{qkd_decoy_sim} 学习文档}
+\date{2026 年 11 月}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+本文回答三个问题：算一条密钥率曲线到底需要哪些量；每个量从哪一步、用什么公式得到；
+这些量按什么顺序流过程序。全文以任务 1（高斯统计界、不优化）为主线，
+任务 2、3 单独成节，重点讲优化算法；公式与代码一一对应。
+阅读对象是第一次接触本工程、对 MATLAB 与量子密钥分发都还不熟悉的读者。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{结论先行}
+%======================================================================
+
+一条密钥率曲线的计算链只有四步：
+
+\begin{center}
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{c}
+\textbf{题目参数} \code{p} \\[2pt]
+$\Downarrow$ \\
+\textbf{第 1 步：物理层} \code{gain.m} \quad 把物理参数变成可观测量 $Q,E,T$ \\[2pt]
+$\Downarrow$ \\
+\textbf{第 2 步：统计层} \code{fluct.m} \quad 给可观测量配上统计置信区间 \\[2pt]
+$\Downarrow$ \\
+\textbf{第 3 步：估计层} \code{estimate.m} \quad 反推单光子参数的安全界 $\YoneZ,\eoneX$ \\[2pt]
+$\Downarrow$ \\
+\textbf{第 4 步：密钥率层} \code{keyRateAt.m} \quad 拼成安全密钥率 $R$
+\end{tabular}
+\end{center}
+
+\code{runCase.m} 只是把上面四步按距离逐点调用，并整理成数组：
+\[
+R(L)=\bigl[\;R(L_1),\;R(L_2),\;\ldots,\;R(L_{301})\;\bigr].
+\]
+
+\begin{center}
+\fbox{\parbox{0.92\linewidth}{
+\textbf{一句话：}\quad
+密钥率 $=$ 资格系数 $\times$（单光子收入 $-$ 纠错支出）。
+收入里的单光子参数测不到，只能用“信号态 $+$ 诱骗态 $+$ 真空态”的可测量去估一个安全界。
+}}
+\end{center}
+
+%======================================================================
+\section{密钥率公式：最终需要哪些量}
+%======================================================================
+
+代码在 \code{+qkd/keyRateAt.m} 第 58--59 行：
+
+\begin{lstlisting}
+R = p.Pu .* p.Pza_u .* p.Pzb .* ...
+    (d.P1u .* Y1Lz .* (1 - H2(e1Ux)) - d.Qu .* p.f .* H2(d.Eu));
+\end{lstlisting}
+
+写成公式：
+\begin{equation}
+R=P_u\,P_{Z\mid u}^{A}\,P_Z^{B}
+\left[
+P_1^u\,\YoneZ\left(1-\Htwo\!\left(\eoneX\right)\right)
+-Q_u\,f\,\Htwo(E_u)
+\right].
+\label{eq:keyrate}
+\end{equation}
+
+逐项拆开：
+
+\begin{longtable}{@{}p{0.17\linewidth}p{0.17\linewidth}p{0.38\linewidth}p{0.18\linewidth}@{}}
+\toprule
+项 & 代码 & 含义 & 从哪来\\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+$P_u$ & \code{p.Pu} & 信号态选择概率 & \code{params.m}\\
+$P_{Z\mid u}^{A}$ & \code{p.Pza_u} & 信号态下 Alice 选 $Z$ 基的概率 & \code{params.m}\\
+$P_Z^{B}$ & \code{p.Pzb} & Bob 选 $Z$ 基的概率 & \code{params.m}\\
+$P_1^u$ & \code{d.P1u} & 信号态脉冲恰好含 1 个光子的概率 & 由 $u$ 算泊松\\
+$\YoneZ$ & \code{Y1Lz} & $Z$ 基单光子响应率的\textbf{下界} & \code{estimate.m}\\
+$\eoneX$ & \code{e1Ux} & $X$ 基单光子误码率的\textbf{上界} & \code{estimate.m}\\
+$Q_u$ & \code{d.Qu} & 信号态增益 & \code{gain.m}\\
+$f$ & \code{p.f} & 纠错效率 & \code{params.m}\\
+$E_u$ & \code{d.Eu} & 信号态误码率 & \code{gain.m}\\
+$\Htwo(\cdot)$ & 匿名函数 & 二进制熵 & \code{keyRateAt.m} 内定义\\
+\end{longtable}
+
+\paragraph{关键观察.}
+公式里只有 $Q_u$ 和 $E_u$ 是信道模型直接给出的；$\Yone$ 和 $\eone$ 永远测不到，
+必须由 \code{estimate.m} 用诱骗态数据反推上下界。而估计 $\Yone,\eone$ 又需要
+$Q_v,T_v,Y_0$——所以 \code{gain.m} 才要算一整套，而不是只算 $Q_u,E_u$。
+
+%======================================================================
+\section{总体数据流：五层}
+%======================================================================
+
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\centering\arraybackslash}p{0.86\linewidth}}
+\toprule
+\textbf{第 1 层：参数层} \quad \code{+qkd/params.m}\\
+$\alpha,\eta_d,d,e_d,e_0,u,v,P_u,P_v,P_{Z\mid u},P_Z,f$；
+派生 $Y_0=2d(1-d)$，$P_0=1-P_u-P_v$\\
+\midrule
+\textbf{第 2 层：物理层} \quad \code{+qkd/gain.m}\\
+$\eta\to\eta_u,\eta_v\to Q_u,Q_v\to E_u,E_v\to T_u,T_v$；输出全是“每个脉冲的概率”\\
+\midrule
+\textbf{第 3 层：统计层} \quad \code{+qkd/fluct.m}\\
+按 \code{method}、\code{eps} 返回三个界限函数 $D.Q$、$D.T$、$D.Y_0$；
+把“点估计 $\pm$ 偏差”变成“置信区间”\\
+\midrule
+\textbf{第 4 层：估计层} \quad \code{+qkd/estimate.m}\\
+脉冲数 $\to$ $Q/T/Y_0$ 的上下界 $\to$ 泊松项 $\to$ 式 (3.28)(3.29)；
+输出 $\YoneZ$（下界）、$\eoneX$（上界）\\
+\midrule
+\textbf{第 5 层：密钥率层} \quad \code{+qkd/keyRateAt.m}\\
+$\Htwo\to$ 收入/支出 $\to R$；负数/NaN 截成 0\\
+\midrule
+\textbf{调度层} \quad \code{+qkd/runCase.m}\\
+逐距离调用 $\to R(L)\to L_{\max}\to$ 返回给 \code{tasks/} 画图\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+各层职责如下：
+
+\begin{longtable}{@{}p{0.10\linewidth}p{0.22\linewidth}p{0.15\linewidth}p{0.25\linewidth}p{0.15\linewidth}@{}}
+\toprule
+层 & 文件 & 输入 & 输出 & 是否含公式\\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+参数 & \code{params.m} & 无 & \code{p} & 只有参数定义\\
+物理 & \code{gain.m} & $p,L$ & $g$（$Q,E,T$） & 是\\
+统计 & \code{fluct.m} & \code{method},\code{eps} & $D$（三个句柄） & 统计界公式\\
+估计 & \code{estimate.m} & $p,L,\text{spec}$ & $\YoneZ,\eoneX,d$ & 是\\
+密钥率 & \code{keyRateAt.m} & $p,L,\text{spec}$ & $R,d$ & 是\\
+调度 & \code{runCase.m} & $p,\text{spec}$ & $L,R,L_{\max}$ & 否\\
+出图 & \code{tasks/run_task*.m} & 无 & PNG/CSV & 否\\
+\end{longtable}
+
+%======================================================================
+\section{第 1 层：参数层 \code{params.m}}
+%======================================================================
+
+\subsection{题目给定的参数}
+
+\begin{longtable}{@{}lllrr@{}}
+\toprule
+代码字段 & 符号 & 含义 & 默认值 & 单位\\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{p.u} & $u$ & 信号态平均光子数 & 0.5 & 个/脉冲\\
+\code{p.v} & $v$ & 诱骗态平均光子数 & 0.1 & 个/脉冲\\
+\code{p.Pu} & $P_u$ & 信号态选择概率 & 0.6 & ---\\
+\code{p.Pv} & $P_v$ & 诱骗态选择概率 & 0.3 & ---\\
+\code{p.Pza_u} & $P_{Z\mid u}^{A}$ & 信号态下 Alice 选 $Z$ 基 & 0.5 & ---\\
+\code{p.Pza_v} & $P_{Z\mid v}^{A}$ & 诱骗态下 Alice 选 $Z$ 基 & 0.5 & ---\\
+\code{p.Pzb} & $P_Z^{B}$ & Bob 选 $Z$ 基 & 0.5 & ---\\
+\code{p.f} & $f$ & 纠错效率 & 1.16 & ---\\
+\code{p.alpha} & $\alpha$ & 光纤损耗 & 0.2 & dB/km\\
+\code{p.etad} & $\eta_d$ & 探测器效率 & 0.5 & ---\\
+\code{p.d} & $d$ & 单探测器暗计数 & $10^{-6}$ & 每脉冲\\
+\code{p.ed} & $e_d$ & 本底误码率 & 0.015 & ---\\
+\code{p.e0} & $e_0$ & 真空态误码率（瞎猜） & 0.5 & ---\\
+\end{longtable}
+
+\subsection{两个派生量}
+
+\textbf{真空态响应率：}
+\begin{equation}
+Y_0=2d(1-d).
+\end{equation}
+Bob 有两个探测器，任一“瞎响”都算响应：
+\[
+1-(1-d)^2=2d-d^2=2d(1-d).
+\]
+默认 $d=10^{-6}$ 时，$Y_0\approx 2\times10^{-6}$。
+
+\textbf{真空态选择概率：}
+\begin{equation}
+P_0=1-P_u-P_v.
+\end{equation}
+默认 $1-0.6-0.3=0.1$。
+
+\begin{note}
+两个“真空”不要混：
+\begin{itemize}[leftmargin=1.6em]
+\item \code{p.P0} $=0.1$：Alice \textbf{选择发送真空态脉冲}的概率；
+\item $P_0^u=e^{-u}$：\textbf{信号态脉冲里恰好含 0 个光子}的概率。
+\end{itemize}
+前者决定“真空样本有多少个”，后者出现在诱骗态公式里。
+\end{note}
+
+\subsection{参数在哪一层被用到}
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+参数 & \code{gain} & \code{estimate} & \code{keyRateAt}\\
+\midrule
+$u,v$ & $\checkmark$ & $\checkmark$ & $u$（算 $P_1^u$）\\
+$P_u,P_v,P_0$ & --- & $\checkmark$（算脉冲数） & $P_u$\\
+$P_{Z\mid u},P_{Z\mid v}$ & --- & $\checkmark$ & $P_{Z\mid u}$\\
+$P_Z^{B}$ & --- & --- & $\checkmark$\\
+$\alpha,\eta_d$ & $\checkmark$ & --- & ---\\
+$d\to Y_0$ & $\checkmark$ & $\checkmark$ & ---\\
+$e_d,e_0$ & $\checkmark$（$E$） & $e_0$（$\eone$ 公式） & ---\\
+$f$ & --- & --- & $\checkmark$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%======================================================================
+\section{第 2 层：物理层 \code{gain.m}}
+%======================================================================
+
+\code{gain} 只算每个脉冲的概率，不管脉冲数。
+
+\subsection{端到端透过率}
+
+\begin{lstlisting}
+g.eta = p.etad .* 10 .^ (-p.alpha .* L ./ 10);
+\end{lstlisting}
+
+\begin{equation}
+\eta=\eta_d\,10^{-\alpha L/10}.
+\end{equation}
+
+推导：光纤每公里损耗 $\alpha$ dB，走 $L$ 公里共损耗 $\alpha L$ dB；
+dB 转功率比为 $10^{-\alpha L/10}$；再乘探测器效率 $\eta_d$。
+
+例：$\alpha=0.2$、$L=100$ 时
+\[
+\alpha L=20\ \text{dB},\qquad
+10^{-20/10}=10^{-2}=0.01,\qquad
+\eta=0.5\times0.01=0.005.
+\]
+意思：光走 100 km，再乘探测器效率，一千个光子里约 5 个能被探测到。
+
+\subsection{“至少收到一个光子”的概率}
+
+\begin{lstlisting}
+g.eta_u = 1 - exp(-g.eta .* p.u);
+g.eta_v = 1 - exp(-g.eta .* p.v);
+\end{lstlisting}
+
+弱相干光源的光子数服从泊松分布，平均光子数为 $\eta l$。一个都没收到的概率为
+$e^{-\eta l}$，所以至少收到一个：
+\begin{equation}
+P(\ge 1)=1-e^{-\eta l}.
+\end{equation}
+
+例（$\eta=0.005$）：
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+强度 & 计算 & 结果\\
+\midrule
+$u=0.5$ & $1-e^{-0.0025}$ & $2.496878\times10^{-3}$\\
+$v=0.1$ & $1-e^{-0.0005}$ & $4.998750\times10^{-4}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{note}
+\code{g.eta_u} 不是“$u$ 的透过率”，而是“光强 $u$ 的脉冲至少被探测到一个光子的概率”。
+真正的透过率是 \code{g.eta}。
+\end{note}
+
+\subsection{增益 $Q$}
+
+\begin{lstlisting}
+g.Qu = p.Y0 + g.eta_u;
+g.Qv = p.Y0 + g.eta_v;
+\end{lstlisting}
+
+\begin{equation}
+Q_l=Y_0+\left(1-e^{-\eta l}\right).
+\end{equation}
+
+两项相加的原因：没有真实光子时，探测器可能自己瞎响（$Y_0$）；有真实光子时，可能被探测到
+（$1-e^{-\eta l}$）。所以总响应概率是两者之和，且物理上 $Q_l\ge Y_0$。
+
+\subsection{误码率 $E$}
+
+\begin{lstlisting}
+g.Eu = (p.e0 .* p.Y0 + p.ed .* g.eta_u) ./ g.Qu;
+g.Ev = (p.e0 .* p.Y0 + p.ed .* g.eta_v) ./ g.Qv;
+\end{lstlisting}
+
+\begin{equation}
+E_l=\frac{e_0Y_0+e_d\left(1-e^{-\eta l}\right)}{Q_l}.
+\end{equation}
+
+分子是“错的概率”：
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+来源 & 概率 & 说明\\
+\midrule
+暗计数猜错 & $e_0Y_0$ & 没收到光子，只能瞎猜，错一半\\
+真实光子判错 & $e_d(1-e^{-\eta l})$ & 器件/对准不完美\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+分母是“响的概率”$Q_l$，所以 $E_l$ 是条件概率：在响了的脉冲里，错的比例。
+
+\subsection{误码计数 $T$}
+
+\begin{lstlisting}
+g.Tu = g.Eu .* g.Qu;
+g.Tv = g.Ev .* g.Qv;
+\end{lstlisting}
+
+\begin{equation}
+T_l=E_lQ_l=P(\text{响应且出错}).
+\end{equation}
+
+它和 $E$ 的区别：$E=P(\text{错}\mid\text{响应})$，$T=P(\text{响应且错})$。
+$T$ 是联合概率，不是“个数”。真正的期望错误个数是 $T N_l$。
+
+\subsection{为什么 \code{gain} 不含 $N$}
+
+$Q,E,T$ 都是每个脉冲的比例。脉冲数要到 \code{estimate} 里才出现：
+\[
+N_{uZ}=P_uP_{Z\mid u}N,\qquad
+n_{Wz}=N_{uZ}Q_u+N_{vZ}Q_v.
+\]
+这样分层的好处：换光纤、换探测器只改 \code{gain}；换脉冲数只在 \code{estimate} 乘一下。
+
+\subsection{100 km 数值例子}
+
+参数：$\alpha=0.2$，$\eta_d=0.5$，$u=0.5$，$v=0.1$，$d=10^{-6}$，
+$e_d=0.015$，$e_0=0.5$。
+
+\begin{center}
+\begin{tabular}{@{}llr@{}}
+\toprule
+量 & 公式 & 数值\\
+\midrule
+$\eta$ & $\eta_d10^{-\alpha L/10}$ & $5.000000\times10^{-3}$\\
+$\eta_u$ & $1-e^{-0.005\times0.5}$ & $2.496878\times10^{-3}$\\
+$\eta_v$ & $1-e^{-0.005\times0.1}$ & $4.998750\times10^{-4}$\\
+$Q_u$ & $Y_0+\eta_u$ & $2.498878\times10^{-3}$\\
+$Q_v$ & $Y_0+\eta_v$ & $5.018750\times10^{-4}$\\
+$E_u$ & 上式 & $1.538824\times10^{-2}$\\
+$E_v$ & 上式 & $1.693284\times10^{-2}$\\
+$T_u$ & $E_uQ_u$ & $3.845316\times10^{-5}$\\
+$T_v$ & $E_vQ_v$ & $8.498124\times10^{-6}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%======================================================================
+\section{第 3 层：统计层 \code{fluct.m}}
+%======================================================================
+
+\subsection{为什么需要这一层}
+
+真实系统只能发有限个脉冲（题目里 $10^8\sim10^{10}$）。用有限样本估出来的 $Q^*,T^*$
+和真值有偏差。安全分析必须给出：
+\[
+\text{我有 }1-\varepsilon\text{ 的把握，真值落在 }[\text{下界},\text{上界}]\text{ 内}.
+\]
+$\varepsilon=10^{-7}$ 表示“说错的概率千万分之一”。
+
+\subsection{返回的是函数，不是数}
+
+\begin{lstlisting}
+D = qkd.fluct(method, eps);
+
+[lo, hi] = D.Q (Q,  Nl, nW);
+[lo, hi] = D.T (T,  Nl, nW);
+[lo, hi] = D.Y0(Y0, N0);
+\end{lstlisting}
+
+\begin{itemize}[leftmargin=1.6em]
+\item $N_l$：这个强度在这个基里发了多少脉冲；
+\item $n_W$：这个基里所有强度一共收到多少事件（霍夫丁要用）；
+\item $N_0$：真空态脉冲数。
+\end{itemize}
+
+$N$ 不在 \code{fluct} 的输入里，而是在调用 \code{D.Q} 时传进去。所以同一个 $D$
+可以服务多个 $N$，缓存只看 \code{method} 和 \code{eps}。
+
+\subsection{三种方法}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+方法 & 偏差公式 & $\varepsilon=10^{-7}$ 时的系数\\
+\midrule
+高斯 & $\Delta=\gamma\sqrt{x/N}$，$\gamma=\sqrt{2}\,\mathrm{erfc}^{-1}(\varepsilon)$ & $\gamma\approx5.327$\\
+霍夫丁 & $\Delta=\sqrt{n_W\ln(1/\varepsilon)/2}\,/N$ & $k=\sqrt{0.5\ln(1/\varepsilon)}\approx2.839$\\
+切尔诺夫（下界） & $\Delta=\sqrt{2x\ln(16/\varepsilon^4)}$ & $\approx11.60\sqrt{x}$\\
+切尔诺夫（上界） & $\widehat{\Delta}=\sqrt{2x\ln(\varepsilon^{-1.5})}$ & $\approx6.95\sqrt{x}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+表中高斯/霍夫丁的 $x$ 是比例（$Q$ 或 $T$），切尔诺夫两式的 $x$ 是计数
+$x=N_lQ_l$。
+
+三种方法的共同形式：
+\begin{equation}
+\mathrm{lo}=\max(\text{点估计}-\Delta,0),\qquad
+\mathrm{hi}=\text{点估计}+\Delta.
+\end{equation}
+
+\subsection{高斯界的 $\gamma$ 怎么来}
+
+标准正态分布的双尾概率为
+\[
+P(|Z|>\gamma)=\mathrm{erfc}\!\left(\frac{\gamma}{\sqrt{2}}\right).
+\]
+要求它等于 $\varepsilon$：
+\[
+\mathrm{erfc}\!\left(\frac{\gamma}{\sqrt{2}}\right)=\varepsilon
+\;\Longrightarrow\;
+\frac{\gamma}{\sqrt{2}}=\mathrm{erfc}^{-1}(\varepsilon)
+\;\Longrightarrow\;
+\gamma=\sqrt{2}\,\mathrm{erfc}^{-1}(\varepsilon).
+\]
+$\varepsilon=10^{-7}$ 时 $\gamma\approx5.327$：要留 5.33 个标准差，才敢以
+$1-10^{-7}$ 的把握说真值在区间内。
+
+\subsection{切尔诺夫界为什么上下不对称}
+
+对计数 $x$，下尾大致满足
+\[
+P(X\le x-\Delta)\lesssim e^{-\Delta^2/(2x)}.
+\]
+代码里：
+\[
+\Delta=\sqrt{2x\ln(16/\varepsilon^4)}
+\quad\Longleftrightarrow\quad
+e^{-\Delta^2/(2x)}=\frac{\varepsilon^4}{16},
+\]
+\[
+\widehat{\Delta}=\sqrt{2x\ln(\varepsilon^{-1.5})}
+\quad\Longleftrightarrow\quad
+e^{-\widehat{\Delta}^2/(2x)}=\varepsilon^{1.5}.
+\]
+$\varepsilon=10^{-7}$ 时，$\varepsilon^4/16\approx6.25\times10^{-29}$ 极小，
+所以 $\Delta$ 很宽；$\varepsilon^{1.5}\approx3.16\times10^{-11}$ 相对大，
+所以 $\widehat{\Delta}$ 较紧。下界更宽是刻意的：估 $\Yone$ 要用 $Q_v$ 的下界，
+宽一点更安全。
+
+\begin{note}
+\code{fluct.m} 里 \code{hoeffBoundY0} 的形状是
+$\Delta Y_0=k\sqrt{Y_0}/N_0$，而 \code{D.Q}/\code{D.T} 的霍夫丁形式是
+$\Delta=k\sqrt{n_W}/N$。若把真空态的期望响应数理解为 $n_W=Y_0N_0$，
+类比会得到 $k\sqrt{Y_0/N_0}$。当前代码写的是 $k\sqrt{Y_0}/N_0$。
+如果要逐字对照指导书 (3.35)，建议确认这一处的原始定义。这不影响
+“样本越多、区间越窄”的定性理解。
+\end{note}
+
+%======================================================================
+\section{第 4 层：估计层 \code{estimate.m}}
+%======================================================================
+
+\subsection{为什么不能直接算 $Y_1,e_1$}
+
+只有单光子脉冲真正安全：多光子脉冲可能被 PNS 攻击。但 Bob 收到响应时，
+不知道刚才那个脉冲里有几个光子；能测到的只有“某个强度的总响应率 $Q$”和
+“总误码率 $E$”。
+
+诱骗态方法写出两个方程：
+\begin{align}
+Q_u&=P_0^uY_0+P_1^uY_1+P_2^uY_2+\cdots,\\
+Q_v&=P_0^vY_0+P_1^vY_1+P_2^vY_2+\cdots.
+\end{align}
+利用 $u>v$ 把 $Y_2$ 消掉，得到 $Y_1$ 的下界；同理用误码计数得到 $e_1$ 的上界。
+
+\subsection{第一步：算脉冲数}
+
+\begin{lstlisting}
+wZ_u = p.Pza_u;       wX_u = 1 - p.Pza_u;
+wZ_v = p.Pza_v;       wX_v = 1 - p.Pza_v;
+
+NuZ = p.Pu * wZ_u * N;
+NvZ = p.Pv * wZ_v * N;
+NuX = p.Pu * wX_u * N;
+NvX = p.Pv * wX_v * N;
+N0  = p.P0 * N;
+\end{lstlisting}
+
+三层过滤：
+\[
+\text{总脉冲数 }N\;\times\;\text{选强度的概率}\;\times\;\text{选基的概率}
+=\text{这个格子的脉冲数}.
+\]
+默认 $N=10^9$ 时：
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+量 & 计算 & 结果\\
+\midrule
+$N_{uZ}$ & $0.6\times0.5\times10^9$ & $3.0\times10^8$\\
+$N_{vZ}$ & $0.3\times0.5\times10^9$ & $1.5\times10^8$\\
+$N_{uX}$ & $0.6\times0.5\times10^9$ & $3.0\times10^8$\\
+$N_{vX}$ & $0.3\times0.5\times10^9$ & $1.5\times10^8$\\
+$N_0$ & $0.1\times10^9$ & $1.0\times10^8$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+真空态不选基，所以只有一个 $N_0$。
+
+\subsection{第二步：真空态响应率的上下界}
+
+\begin{lstlisting}
+[Y0_lo, Y0_hi] = D.Y0(p.Y0, N0);
+\end{lstlisting}
+
+真空态脉冲里没有光子，Bob 却响应，那只能是暗计数。它是最干净的噪声测量，
+所以用它校准后面所有估计。
+
+\subsection{第三步：$Z$ 基增益的上下界}
+
+\begin{lstlisting}
+nWz = NuZ .* g.Qu + NvZ .* g.Qv;
+[QuZ_lo, QuZ_hi] = D.Q(g.Qu, NuZ, nWz);
+[QvZ_lo, QvZ_hi] = D.Q(g.Qv, NvZ, nWz);
+\end{lstlisting}
+
+$n_{Wz}$ 是 $Z$ 基里两种强度一共收到的期望事件数。
+
+\subsection{第四步：$X$ 基同样处理}
+
+\begin{lstlisting}
+nWx = NuX .* g.Qu + NvX .* g.Qv;
+[QuX_lo, QuX_hi] = D.Q(g.Qu, NuX, nWx);
+[QvX_lo, QvX_hi] = D.Q(g.Qv, NvX, nWx);
+[~, TvX_hi]      = D.T(g.Tv, NvX, nWx);
+\end{lstlisting}
+
+$X$ 基用来估误码。$T_v$ 只需要上界，所以用 \code{~} 丢掉下界。
+
+\subsection{第五步：泊松项}
+
+\begin{lstlisting}
+np = @(n, l) exp(-l) .* l.^n ./ factorial(n);
+
+P1u = np(1, p.u);  P2u = np(2, p.u);  P0u = np(0, p.u);
+P1v = np(1, p.v);  P2v = np(2, p.v);  P0v = np(0, p.v);
+\end{lstlisting}
+
+\begin{equation}
+P_n^l=e^{-l}\frac{l^n}{n!}.
+\end{equation}
+
+$u=0.5$、$v=0.1$ 时：
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+项 & $u=0.5$ & $v=0.1$\\
+\midrule
+$P_0$ & $6.065307\times10^{-1}$ & $9.048374\times10^{-1}$\\
+$P_1$ & $3.032653\times10^{-1}$ & $9.048374\times10^{-2}$\\
+$P_2$ & $7.581633\times10^{-2}$ & $4.524187\times10^{-3}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{公式 (3.28)：单光子响应率下界}
+
+分母：
+\begin{lstlisting}
+den = P1v .* P2u - P1u .* P2v;
+\end{lstlisting}
+\begin{equation}
+P_1^vP_2^u-P_1^uP_2^v
+=e^{-(u+v)}\frac{uv(u-v)}{2}.
+\end{equation}
+只要 $u>v$，分母恒正。这就是“诱骗态必须比信号态弱”的数学原因。
+
+公式：
+\begin{equation}
+\YoneZ=
+\frac{
+P_2^uQ_v^L-P_2^vQ_u^U+
+\left(P_2^vP_0^u-P_2^uP_0^v\right)Y_0^U
+}{
+P_1^vP_2^u-P_1^uP_2^v
+}.
+\label{eq:y1}
+\end{equation}
+
+代码：
+
+\begin{lstlisting}
+Y1Lz = (P2u .* QvZ_lo - P2v .* QuZ_hi + ...
+        (P2v .* P0u - P2u .* P0v) .* Y0_hi) ./ den;
+Y1Lz = max(Y1Lz, 0);
+\end{lstlisting}
+
+为什么这样取上下界：
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+量 & 取哪一侧 & 效果\\
+\midrule
+$Q_v$ & 下界 $Q_v^L$ & 分子变小 $\to$ $\Yone$ 变小\\
+$Q_u$ & 上界 $Q_u^U$ & 被减项变大 $\to$ $\Yone$ 变小\\
+$Y_0$ & 上界 $Y_0^U$ & 系数在 $u>v$ 时为负 $\to$ $\Yone$ 变小\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+每一步都朝“让 $\Yone$ 更小”的方向取——宁少勿多。
+
+\subsection{公式推导思路}
+
+写出两个强度的增益：
+\begin{align}
+Q_u&=P_0^uY_0+P_1^uY_1+P_2^uY_2+H_u,\\
+Q_v&=P_0^vY_0+P_1^vY_1+P_2^vY_2+H_v,
+\end{align}
+其中 $H$ 是三光子及以上的贡献。为了消掉 $Y_2$，计算
+\[
+P_2^vQ_u-P_2^uQ_v.
+\]
+整理后 $Y_2$ 项抵消：
+\begin{align}
+\left(P_1^vP_2^u-P_1^uP_2^v\right)Y_1
+={}&P_2^uQ_v-P_2^vQ_u
++\left(P_2^vP_0^u-P_2^uP_0^v\right)Y_0 \notag\\
+&-\left(P_2^uH_v-P_2^vH_u\right).
+\end{align}
+对 $u>v$、$n\ge3$，可以证明
+$P_2^uP_n^v-P_2^vP_n^u<0$，所以
+$P_2^uH_v-P_2^vH_u\le0$。把它丢掉，右边只会更小，于是得到下界。
+
+\subsection{公式 (3.29)：单光子误码率上界}
+
+误码计数：
+\begin{equation}
+T_l=E_lQ_l
+=P_0^le_0Y_0+P_1^le_1Y_1+\sum_{n\ge2}P_n^le_nY_n.
+\end{equation}
+丢掉非负的高阶项：
+\[
+T_v\ge P_0^ve_0Y_0+P_1^ve_1Y_1.
+\]
+移项：
+\begin{equation}
+\eone\le
+\frac{T_v-P_0^ve_0Y_0}{P_1^vY_1}.
+\end{equation}
+
+代码：
+
+\begin{lstlisting}
+e1Ux = (TvX_hi - P0v .* p.e0 .* Y0_lo) ./ ...
+       (P1v .* max(Y1Lx, realmin));
+e1Ux = min(max(e1Ux, 0), 0.5);
+\end{lstlisting}
+
+保守方向：
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+量 & 取哪一侧 & 效果\\
+\midrule
+$T_v$ & 上界 $T_v^U$ & 分子变大 $\to$ $\eone$ 变大\\
+$Y_0$ & 下界 $Y_0^L$ & 扣得少 $\to$ 分子更大 $\to$ $\eone$ 变大\\
+$Y_1$ & 下界 $Y_1^L$ & 分母变小 $\to$ $\eone$ 变大\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{max(Y1Lx, realmin)} 防止除以 0；\code{min(max(..., 0), 0.5)} 把误码率限制在
+$[0,0.5]$。
+
+\subsection{估不出来时直接认输}
+
+\begin{lstlisting}
+e1Ux(Y1Lx <= 0) = 0.5;
+\end{lstlisting}
+
+如果连单光子响应率都估不出来，就按最坏情况处理：单光子误码等同于瞎猜。
+此时 $\Htwo(0.5)=1$，隐私放大扣掉全部比特，密钥率被压到 0。
+
+\subsection{100 km 数值例子}
+
+$N=10^9$、$\varepsilon=10^{-7}$、高斯界：
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+量 & 数值\\
+\midrule
+$Y_0^L$ / $Y_0^U$ & $1.2466\times10^{-6}$ / $2.7534\times10^{-6}$\\
+$Q_u^{Z,L}$ / $Q_u^{Z,U}$ & $2.4835\times10^{-3}$ / $2.5143\times10^{-3}$\\
+$Q_v^{Z,L}$ / $Q_v^{Z,U}$ & $4.9213\times10^{-4}$ / $5.1162\times10^{-4}$\\
+$T_v^{X,U}$ & $9.7661\times10^{-6}$\\
+$\mathrm{den}$ & $5.4881\times10^{-3}$\\
+$\YoneZ$ & $4.6925\times10^{-3}$\\
+$Y_1^{X,L}$ & $4.6925\times10^{-3}$（两基对称）\\
+$\eoneX$ & $2.1673\times10^{-2}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%======================================================================
+\section{第 5 层：密钥率层 \code{keyRateAt.m}}
+%======================================================================
+
+\subsection{信号态单光子概率}
+
+\begin{lstlisting}
+d.P1u = exp(-p.u) .* p.u;
+\end{lstlisting}
+\begin{equation}
+P_1^u=e^{-u}u.
+\end{equation}
+$u=0.5$ 时 $P_1^u=3.032653\times10^{-1}$。
+
+\subsection{二进制熵}
+
+\begin{lstlisting}
+H2 = @(x) -(x .* log2(max(x, realmin)) + ...
+            (1 - x) .* log2(max(1 - x, realmin)));
+\end{lstlisting}
+\begin{equation}
+\Htwo(x)=-x\log_2 x-(1-x)\log_2(1-x).
+\end{equation}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+$x$ & $\Htwo(x)$\\
+\midrule
+0 & 0\\
+0.5 & 1\\
+0.015 & $\approx0.115$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{max(., realmin)} 防止 $\log_2 0=-\infty$ 污染结果。
+
+\subsection{收入与支出}
+
+\begin{align}
+\text{收入}&=P_1^u\,\YoneZ\left(1-\Htwo(\eoneX)\right),\\
+\text{支出}&=Q_u\,f\,\Htwo(E_u).
+\end{align}
+
+收入：单光子脉冲里，扣掉 Eve 可能知道的信息后，还能留下的比特；
+支出：纠错必须公开的比特数。
+
+资格系数：
+\[
+P_uP_{Z\mid u}^{A}P_Z^{B}=0.6\times0.5\times0.5=0.15.
+\]
+只有“信号态 $+$ Alice 选 $Z$ $+$ Bob 选 $Z$”的脉冲才参与成码。
+
+\subsection{截断}
+
+\begin{lstlisting}
+R(~isfinite(R)) = 0;
+R(R < 0) = 0;
+\end{lstlisting}
+
+NaN/Inf 表示估计失效或参数越界，按“无密钥”处理；负数表示收入不够付支出，
+物理上意味着通信应停止。截成 0 而不是删除，是为了让 $R$ 和 $L$ 保持一一对应。
+
+\subsection{100 km 结果}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+量 & 数值\\
+\midrule
+$P_1^u$ & $3.032653\times10^{-1}$\\
+$\Htwo(\eoneX)$ & $1.5074\times10^{-1}$\\
+$\Htwo(E_u)$ & $1.1470\times10^{-1}$\\
+收入 $P_1^u\YoneZ(1-\Htwo(\eoneX))$ & $1.2086\times10^{-3}$\\
+支出 $Q_uf\Htwo(E_u)$ & $3.3243\times10^{-4}$\\
+差值 & $8.762\times10^{-4}$\\
+资格系数 & $0.15$\\
+\textbf{$\bm{R}$} & $\bm{1.3143\times10^{-4}}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+这个值与 \code{checks/runTests.m} 里高斯金标准
+$R(100)=1.314340882149\times10^{-4}$ 一致（手算四舍五入）。
+
+%======================================================================
+\section{调度层：\code{runCase.m} 与 \code{tasks/}}
+%======================================================================
+
+\code{keyRateAt} 只算一个距离点。要画曲线，还需要外层循环。
+
+\subsection{\code{runCase} 做的事}
+
+\begin{lstlisting}
+L = spec.L(1) : spec.L(3) : spec.L(2);
+for i = 1:n
+    out.R(i) = rateFor(p, L(i), spec, p.u, p.v, p.Pu, p.Pv);
+end
+\end{lstlisting}
+
+三种模式：
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\code{spec.opt} & 行为 & 任务\\
+\midrule
+\code{none} & 参数固定，只扫距离 & 任务 1\\
+\code{u} & 每个距离选最优 $u$（601 个候选） & 任务 2\\
+\code{global} & 差分进化联合优化 $(u,v,P_u,P_v)$ & 任务 3\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{\code{rateFor}：把参数写回表}
+
+\begin{lstlisting}
+function R = rateFor(p, L, spec, u, v, Pu, Pv)
+q = p;
+q.u = u;  q.v = v;
+q.Pu = Pu; q.Pv = Pv;
+q.P0 = 1 - Pu - Pv;
+R = qkd.keyRateAt(q, L, spec);
+end
+\end{lstlisting}
+
+优化的本质就是：改参数 $\to$ 重算 $\to$ 比较 $\to$ 再改。
+
+\subsection{最远成码距离}
+
+\begin{lstlisting}
+idx = find(out.R > 0, 1, 'last');
+out.Lmax = out.L(idx);
+\end{lstlisting}
+
+最后一个还有正密钥的距离，就是“最远成码距离”。
+
+\subsection{任务脚本只负责三件事}
+
+\begin{enumerate}[leftmargin=1.8em]
+\item 收集参数（\code{p} $+$ \code{spec}）；
+\item 调 \code{qkd.runCase}；
+\item 画图 $+$ \code{saveResult}。
+\end{enumerate}
+
+任务脚本里没有任何物理公式。
+
+%======================================================================
+\section{任务 2：一维网格搜索（只优化信号态光强 $u$）}
+%======================================================================
+
+\subsection{任务目标与调用链}
+
+任务 2 在 $N=10^9$ 下比较高斯、霍夫丁、切尔诺夫三种统计界，并对每个距离点
+单独选择最优信号态光强 $u$。它输出两张图：
+\begin{itemize}[leftmargin=1.6em]
+\item \code{fig2_three_methods}：三种方法的 $R$--$L$ 曲线；
+\item \code{fig2b_optimal_u}：最优 $u^*(L)$ 随距离的变化。
+\end{itemize}
+
+调用链：
+\begin{lstlisting}
+run_task2
+  -> qkd.runCase(p, spec)              % spec.opt = 'u'
+       -> rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv)
+            -> qkd.keyRateAt(q, L(i), spec)
+                 -> qkd.estimate(q, L(i), spec)
+\end{lstlisting}
+
+\subsection{优化模型}
+
+对每个固定距离 $L$，只优化一个变量：
+\begin{equation}
+u^*(L)=\operatorname*{arg\,max}_{u\in\mathcal{U}} R(L;u,v,P_u,P_v),
+\end{equation}
+其中
+\begin{equation}
+\mathcal{U}=\{0.10+j\Delta u\}_{j=0}^{600},\qquad
+\Delta u=\frac{1.30-0.10}{600}=0.002.
+\end{equation}
+$v,P_u,P_v$ 保持题目给定值不变，只有 $u$ 在 $[0.10,1.30]$ 上搜索。
+
+为什么用网格而不是梯度法：
+\begin{itemize}[leftmargin=1.6em]
+\item 只有一维，601 个点完全可以穷举；
+\item $R(u)$ 经过诱骗态估计和统计界，解析导数很难写；
+\item 网格搜索是确定性的，不引入随机性，容易复现和解释。
+\end{itemize}
+
+\subsection{代码实现}
+
+任务脚本中的 \code{spec}：
+\begin{lstlisting}
+spec = struct('method', meth{k}, 'N', 1e9, 'eps', 1e-7, ...
+              'L', [0 300 1], 'opt', 'u', ...
+              'optU', struct('lb', 0.10, 'ub', 1.30, ...
+                             'n', 601, 'mode', 'perDistance'));
+\end{lstlisting}
+
+\code{runCase} 的 \code{u} 模式分支：
+\begin{lstlisting}
+ug = linspace(spec.optU.lb, spec.optU.ub, spec.optU.n);
+
+for i = 1:n
+    Rv = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
+    [rmax, k] = max(Rv);
+    out.R(i) = rmax;
+    out.u(i) = ug(k);
+end
+\end{lstlisting}
+
+关键点：\code{rateFor} 的第四个参数是向量 \code{ug}，不是标量。
+\code{keyRateAt} 以及它调用的 \code{gain}、\code{estimate} 全部使用逐元素运算，
+所以一次调用就能算出 601 个候选的 $R$，返回长度 601 的向量 \code{Rv}。
+然后 \code{max} 找出最大值与下标，把对应的 $u$ 记进 \code{out.u(i)}。
+
+这样距离循环只执行 301 次，而不是 $301\times601$ 次；
+601 个候选的评估被压在每次向量化调用里。
+
+\subsection{另一种模式：整段统一 $u$}
+
+\code{runCase} 还支持 \code{mode} 设为 \code{fixed}：整条曲线用一个 $u$。
+实现是先把所有候选算成矩阵：
+\begin{lstlisting}
+Rm = zeros(numel(ug), n);
+for i = 1:n
+    Rm(:, i) = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
+end
+[~, uIdx] = max(sum(Rm > 0, 2));
+out.R = Rm(uIdx, :);
+out.u = ug(uIdx) * ones(1, n);
+\end{lstlisting}
+对矩阵 \code{Rm} 的每一行，统计该候选能让多少个距离点保持正密钥
+（即该行大于 0 的元素个数），取最大的那个，即“传得最远”的 $u$。
+任务 2 用的是 \code{perDistance}，不是这个模式，但理解它有助于回答
+“实际系统能不能按距离换 $u$”。
+
+\subsection{复杂度、精度与一个注释不一致}
+
+任务 2 的候选评估量：
+\begin{equation}
+3\text{ 种方法}\times301\text{ 个距离}\times601\text{ 个候选}
+=543{,}903\text{ 次单点 }R\text{ 评估}.
+\end{equation}
+由于每次 \code{rateFor} 一次算 601 个候选，实际只发生
+$3\times301=903$ 次向量化调用。
+
+网格分辨率 $\Delta u=0.002$。\code{argmax} 给出的 $u^*$ 与真实连续最优最多差半个网格；
+由于 $R(u)$ 在最优附近通常较平，密钥率的误差远小于 $0.002$ 本身。
+
+\begin{note}
+当前 \code{run_task2.m} 里写的是 \code{n = 601}，但同一行的注释仍写“61 个候选”。
+以代码为准。工程文档里任务 2 的实测数字是按 \code{n = 61} 记录的；
+如果重新用 601 跑，$L_{\max}$ 和 $u^*(L)$ 可能有轻微变化。
+\end{note}
+
+\subsection{物理读图：$u^*(L)$ 为什么随距离下降}
+
+近距离时，光纤损耗小，可以适当提高 $u$ 来增加响应率；
+远距离时，单光子到达率已经很低，如果 $u$ 太大，多光子比例上升，
+诱骗态估计给出的 $\YoneZ$ 下界会被压得更低，反而得不偿失。
+所以最优 $u$ 通常随距离单调下降——这也是 \code{fig2b_optimal_u} 想回答的问题。
+
+工程文档中的一组实测值（\code{n = 61} 时）：
+高斯 $L_{\max}=176$ km，霍夫丁 $157$ km，切尔诺夫 $164$ km。
+当前 \code{run_task2.m} 改为 \code{n = 601} 后，数值可能略有变化。
+
+%======================================================================
+\section{任务 3：四维全局优化（差分进化 + 坐标下降）}
+%======================================================================
+
+\subsection{任务目标}
+
+任务 3 在切尔诺夫界、$N=10^9$ 下，同时优化四个参数：
+\[
+(u,\ v,\ P_u,\ P_v).
+\]
+先跑一条 \code{opt} 为 \code{none} 的基准曲线，再跑 \code{opt} 为 \code{global} 的优化曲线，
+比较最远成码距离和同距离下的速率增益。
+
+\subsection{为什么不能继续网格搜索}
+
+任务 2 的一维网格只有 601 个点；如果四个维度各取 30 个点，组合数是
+\[
+30^4=810{,}000,
+\]
+而且每个候选都要跑完整的 \code{gain}、\code{fluct}、\code{estimate}、
+\code{keyRateAt} 链。目标函数还非凸、带约束、没有解析梯度。所以任务 3
+不再穷举，而是用\textbf{差分进化}（Differential Evolution, DE）做全局搜索，
+再用\textbf{坐标下降}做局部打磨。
+
+\subsection{优化变量、边界与约束}
+
+代码把四个变量写成
+\begin{equation}
+x=(u,\ v/u,\ P_u,\ P_v),
+\end{equation}
+第二维用比值 $v/u$ 而不是 $v$ 本身。这样做有两个好处：
+\begin{itemize}[leftmargin=1.6em]
+\item 只要 $v/u<1$，就自动保证 $v<u$，不会出现 (3.28) 分母变号；
+\item $u$ 和 $v$ 同比例缩放时比值不变，搜索空间更“正”。
+\end{itemize}
+
+边界：
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+变量 & 下界 & 上界\\
+\midrule
+$u$ & 0.10 & 1.40\\
+$v/u$ & 0.02 & 0.90\\
+$P_u$ & 0.05 & 0.90\\
+$P_v$ & 0.02 & 0.90\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+目标函数就是完整链算出的密钥率：
+\begin{equation}
+f(x)=R(L;u,v,P_u,P_v),
+\end{equation}
+但 \code{objFun} 会把不合法的候选直接判 0：
+\begin{align}
+v&\ge u &&\Rightarrow f=0,\\
+P_u+P_v&>0.95 &&\Rightarrow f=0,\\
+P_u&\le0\ \text{或}\ P_v\le0 &&\Rightarrow f=0.
+\end{align}
+$P_u+P_v\le0.95$ 是为了给真空态至少留 $5\%$ 的样本；
+否则 $Y_0$ 估不准，整个诱骗态估计会失效。计算中出现的 NaN/Inf 也一律记 0。
+
+\subsection{外层：5 km 粗网格}
+
+全局优化的单点代价约为普通扫描的几百倍，所以不在 301 个 1 km 点上逐个优化，
+而是先每隔 5 km 优化一次：
+\begin{lstlisting}
+stepIdx = max(1, round(gopt.strideL / spec.L(3)));
+idxC    = unique([1:stepIdx:n, n]);
+nc      = numel(idxC);
+\end{lstlisting}
+取 \code{strideL = 5}、\code{spec.L = [0 300 1]} 时：
+\[
+\text{idxC}=[1,6,11,\ldots,296,301],\qquad nc=61.
+\]
+
+为什么可以这样：相邻距离点的最优参数几乎连成一条平滑曲线，
+每 5 km 优化一次足够；插值带来的保守性远小于“少算一半距离”的误差。
+
+\subsection{内层：差分进化}
+
+每一代种群有 \code{npop} 个个体，每个个体是一个四维候选。任务 3 用
+\code{npop=30}、\code{ngen=40}；\code{runCase} 的默认值是 40 和 60。
+
+伪代码：
+\begin{lstlisting}
+pop = lb + rand(npop, Dm) .* (ub - lb);
+fit = objFun(p, L, spec, pop);
+
+for g = 1:ngen
+    for i = 1:npop
+        pick three random indices r1, r2, r3
+        mutant(i,:) = pop(r1,:) + F*(pop(r2,:) - pop(r3,:));
+        mutant(i,:) = clamp(mutant(i,:), lb, ub);
+    end
+    crossover ...
+    trial = pop;  trial(cross) = mutant(cross);
+    ft = objFun(p, L, spec, trial);
+    where ft > fit:  pop = trial;  fit = ft;
+end
+xb = best individual;
+\end{lstlisting}
+
+三个核心公式。
+
+\textbf{变异（mutation）：}
+\begin{equation}
+m_i=x_{r_1}+F\,(x_{r_2}-x_{r_3}),\qquad F=0.6.
+\end{equation}
+拿两个个体的差去推第三个个体；$F$ 是步长。
+
+\textbf{交叉（crossover）：}
+\begin{equation}
+t_{i,d}=
+\begin{cases}
+m_{i,d}, & U_{i,d}\le CR\ \text{或}\ d=d_{\text{rand}},\\
+x_{i,d}, & \text{otherwise},
+\end{cases}
+\qquad CR=0.7.
+\end{equation}
+每个维度以 $70\%$ 的概率采用变异结果；$d_{\text{rand}}$ 保证至少有一维来自变异，
+否则试验个体可能和父代完全一样，进化白做。
+
+\textbf{选择（selection）：}
+\begin{equation}
+x_i\leftarrow
+\begin{cases}
+t_i, & f(t_i)>f(x_i),\\
+x_i, & \text{otherwise}.
+\end{cases}
+\end{equation}
+只留更好的，这就是“进化”。
+
+\code{objFun} 支持矩阵输入：一次传入 \code{npop}$\times4$ 的候选矩阵，
+返回 \code{npop}$\times1$ 的得分向量。因为 \code{keyRateAt} 是逐元素运算，
+一整代可以在一次调用里评估完。
+
+\subsection{可复现性与两个实现细节}
+
+\code{optimizeGlobal} 开头有
+\begin{lstlisting}
+rng(20260101);
+\end{lstlisting}
+固定随机种子，保证每次运行得到完全一样的结果。
+
+\begin{itemize}[leftmargin=1.6em]
+\item 这个 \code{rng} 在每个粗距离点都会调用一次，所以每个点都从同一条随机序列开始。
+      好处是完全可复现；代价是各点的随机流不是独立的。若想要独立重复，可以把
+      \code{rng} 移到外层，或按距离设置不同种子。
+\item 抽取参照个体用的是 \code{randperm(npop,3)}，它没有排除当前个体 $i$。
+      标准 DE 通常要求 $r_1,r_2,r_3$ 与 $i$ 不同；这里属于实现细节，
+      对启发式搜索影响有限，但严格实现可以从“其余个体”中抽样。
+\end{itemize}
+
+\subsection{局部打磨：坐标下降}
+
+差分进化擅长“找到大致方向”，但不擅长“精确到小数点后三位”。所以在最优个体附近
+再做一次无导数局部搜索：
+\begin{lstlisting}
+step = 0.05 * (ub - lb);
+for iter = 1:30
+    improved = false;
+    for d = 1:4
+        for s = [-1, 1]
+            cand = xb;
+            cand(d) = clamp(cand(d) + s*step(d), lb(d), ub(d));
+            fc = objFun(p, L, spec, cand);
+            if fc > fb
+                xb = cand; fb = fc; improved = true;
+            end
+        end
+    end
+    if ~improved
+        step = step * 0.5;
+        if all(step < 1e-4), break; end
+    end
+end
+\end{lstlisting}
+
+数学上就是逐维坐标搜索：
+\begin{equation}
+x^{(k+1)}=x^{(k)}+s_d\,\mathrm{step}_d\,\mathbf{e}_d,
+\qquad s_d\in\{-1,+1\},
+\end{equation}
+有改进就接受；一整轮都没改进就把步长减半；四个维度的步长都小于 $10^{-4}$ 时停止。
+
+为什么用坐标下降而不是梯度法：目标函数经过约束裁剪、统计界和截断，
+既不光滑也没有可靠导数；坐标搜索只需要比较函数值，稳健且实现简单。
+
+\subsection{回到 1 km：插值参数，不插值曲线}
+
+粗网格只有 61 个点，最终要输出 301 个 1 km 点。代码的做法是：
+\begin{enumerate}[leftmargin=1.8em]
+\item 只保留“参数有限且 $R>0$”的粗点；
+\item 把这些粗点的最优参数插值到所有 1 km 点：
+\begin{equation}
+x(L)=\mathrm{interp1}\!\left(L_{\text{coarse}},x^*_{\text{coarse}},L,
+\text{linear},\mathrm{NaN}\right);
+\end{equation}
+\item 用插值出来的参数，在每个 1 km 点重新算一次完整的 $R$。
+\end{enumerate}
+
+为什么插值参数而不是直接插值 $R$：
+\begin{itemize}[leftmargin=1.6em]
+\item $R(L)$ 随距离指数下降，线性插值曲线会明显失真；
+\item 最优参数 $u^*(L),v^*(L),P_u^*(L),P_v^*(L)$ 变化平滑，适合插值；
+\item 每个细点都用真实模型重算，结果是“真算出来的”，只是参数未必对该点最优，
+      所以略偏保守（宁可低估）。
+\end{itemize}
+
+范围外的插值返回 \code{NaN}，进入 \code{keyRateAt} 后被截成 $R=0$，
+所以曲线不会出现 NaN。
+
+\subsection{断崖区细化}
+
+粗网格每 5 km 才一个点，可能把最后不到 5 km 的成码区漏掉，让 $L_{\max}$ 少算几公里。
+所以代码在“最后一个有密钥的粗点”和“下一个粗点”之间，逐点重新优化：
+\begin{lstlisting}
+kl = find(Rc > 0, 1, 'last');
+if ~isempty(kl) && kl < nc
+    for i = idxC(kl)+1 : idxC(kl+1)-1
+        [xb, fb] = optimizeGlobal(p, L(i), spec, gopt);
+        out.u(i)  = xb(1);
+        out.v(i)  = xb(1) * xb(2);
+        out.Pu(i) = xb(3);
+        out.Pv(i) = xb(4);
+        out.R(i)  = fb;
+    end
+end
+\end{lstlisting}
+这一段最多只有 4 个点，但能把 $L_{\max}$ 补准。
+
+\subsection{收尾：无密钥区的参数}
+
+\begin{lstlisting}
+dead = out.R <= 0;
+out.u(dead) = NaN;  out.v(dead) = NaN;
+out.Pu(dead) = NaN; out.Pv(dead) = NaN;
+\end{lstlisting}
+没有密钥的区域不存在“最优参数”，置成 NaN 后画图会自然断开，不会出现无意义的跳变。
+$L_{\max}$ 仍然定义为最后一个 $R>0$ 的距离。
+
+\subsection{复杂度与设计取舍}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+项目 & 任务 2 & 任务 3\\
+\midrule
+优化变量 & $u$（1 维） & $(u,v,P_u,P_v)$（4 维）\\
+搜索方式 & 网格穷举 & 差分进化 + 坐标下降\\
+搜索规模 & 601 个候选 & \code{npop=30}, \code{ngen=40}\\
+距离处理 & 每个 1 km 独立 & 5 km 粗网格 + 参数插值 + 断崖细化\\
+确定性 & 完全确定 & 固定种子，仍可复现\\
+最优性 & 网格内全局最优 & 启发式，不保证全局最优\\
+输出 & $R(L),u^*(L)$ & $R(L),u^*,v^*,P_u^*,P_v^*$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+粗略的候选评估量：
+\begin{itemize}[leftmargin=1.6em]
+\item 任务 2：$3\times301\times601\approx5.4\times10^5$ 次单点 $R$ 评估，
+      但每次向量化评估 601 个候选；
+\item 任务 3：每个粗点约 $30\times40=1200$ 次 DE 候选评估，再加最多
+      $30\times4\times2=240$ 次局部搜索；61 个粗点合计约 $9\times10^4$ 次候选评估，
+      另加断崖细化。
+\end{itemize}
+任务 3 的每次候选评估都要跑完整条估计链，所以它是整个工程最慢的部分；
+\code{run_task3.m} 的注释说全局优化约占任务 3 运行时间的 $96\%$。
+
+\subsection{物理读图：四个最优参数为什么随距离漂移}
+
+\begin{itemize}[leftmargin=1.6em]
+\item 近距离：可以适当提高 $u$、降低 $v$，用更强的信号换响应率；
+\item 远距离：单光子到达率低，必须提高 $v$ 与 $P_v$ 才能把单光子参数估准，
+      同时压低 $u$，避免多光子比例过高；
+\item $P_u$ 与真空态概率 $P_0=1-P_u-P_v$ 互相挤压：$P_u$ 太大，真空样本太少，
+      $Y_0$ 的统计误差变大，反而会拖累远端性能。
+\end{itemize}
+
+工程文档中的一组实测值：切尔诺夫、$N=10^9$ 时，未优化 $L_{\max}=164$ km，
+全局优化后 $171$ km；速率提升约 $+49\%$ @50 km、$+30\%$ @100 km、$+14\%$ @150 km。
+这些数字随 \code{npop/ngen} 和统计界设置会变化，仅作量级参考。
+
+%======================================================================
+\section{完整链路与端到端数值示例}
+%======================================================================
+
+\subsection{公式链}
+
+\begin{align*}
+&p.\alpha,\ p.\eta_d,\ L
+\;\Longrightarrow\;
+\eta=\eta_d10^{-\alpha L/10}\\
+&\Longrightarrow\;
+\eta_u=1-e^{-\eta u},\quad \eta_v=1-e^{-\eta v}\\
+&\Longrightarrow\;
+Q_u=Y_0+\eta_u,\quad Q_v=Y_0+\eta_v\\
+&\Longrightarrow\;
+E_u,E_v\quad\Longrightarrow\quad T_u=E_uQ_u,\quad T_v=E_vQ_v\\
+&\Longrightarrow\;
+D.Q,\ D.T,\ D.Y_0\ \text{给出上下界}\\
+&\Longrightarrow\;
+P_1^u,P_2^u,P_0^u,P_1^v,P_2^v,P_0^v\\
+&\Longrightarrow\;
+\YoneZ=\frac{P_2^uQ_v^L-P_2^vQ_u^U+
+(P_2^vP_0^u-P_2^uP_0^v)Y_0^U}{P_1^vP_2^u-P_1^uP_2^v}\\
+&\Longrightarrow\;
+\eoneX=\frac{T_v^U-P_0^ve_0Y_0^L}{P_1^vY_1^{X,L}}\\
+&\Longrightarrow\;
+R=P_uP_{Z\mid u}^{A}P_Z^{B}
+\left[P_1^u\YoneZ\left(1-\Htwo(\eoneX)\right)
+-Q_uf\Htwo(E_u)\right].
+\end{align*}
+
+\subsection{函数调用栈}
+
+\begin{lstlisting}
+run_task1
+  -> qkd.runCase
+       -> rateFor
+            -> qkd.keyRateAt
+                 -> qkd.estimate
+                      -> qkd.fluct
+                      -> qkd.gain
+                 -> H2
+\end{lstlisting}
+
+\subsection{数据形状}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+阶段 & 标量情形 & 向量情形\\
+\midrule
+\code{L} & 单个距离 & $1\times301$\\
+\code{p.u} & 0.5 & 优化时可能 $1\times61$ 或 $1\times301$\\
+$Q,E,T$ & 标量 & 与 \code{L}/参数同形状\\
+上下界 & 标量 & 同形状\\
+$R$ & 标量 & $1\times301$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+所有内核函数都用 \code{.*}、\code{./} 和逐元素幂 \verb|.^| 写成逐元素运算，
+所以同一套代码能同时处理标量和数组。
+
+\subsection{100 km 端到端示例}
+
+参数：
+\[
+N=10^9,\quad \varepsilon=10^{-7},\quad \text{method}=\text{gauss},\quad L=100\text{ km},
+\]
+\[
+u=0.5,\ v=0.1,\ P_u=0.6,\ P_v=0.3,\
+P_{Z\mid u}=P_{Z\mid v}=P_Z^{B}=0.5,
+\]
+\[
+\alpha=0.2,\ \eta_d=0.5,\ d=10^{-6},\ e_d=0.015,\ e_0=0.5,\ f=1.16.
+\]
+
+\begin{longtable}{@{}rllr@{}}
+\toprule
+步骤 & 量 & 公式 & 数值\\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+1 & $Y_0$ & $2d(1-d)$ & $1.999998\times10^{-6}$\\
+2 & $\eta$ & $\eta_d10^{-\alpha L/10}$ & $5.000000\times10^{-3}$\\
+3 & $\eta_u,\eta_v$ & $1-e^{-\eta l}$ & $2.496878\times10^{-3}$,\ $4.998750\times10^{-4}$\\
+4 & $Q_u,Q_v$ & $Y_0+\eta_l$ & $2.498878\times10^{-3}$,\ $5.018750\times10^{-4}$\\
+5 & $E_u,E_v$ & 上式 & $1.538824\times10^{-2}$,\ $1.693284\times10^{-2}$\\
+6 & $T_u,T_v$ & $E_lQ_l$ & $3.845316\times10^{-5}$,\ $8.498124\times10^{-6}$\\
+7 & $N_{uZ},N_{vZ},N_0$ & $P_uP_{Z\mid u}N,\ldots$ & $3.0\times10^8$,\ $1.5\times10^8$,\ $1.0\times10^8$\\
+8 & $n_{Wz}$ & $N_{uZ}Q_u+N_{vZ}Q_v$ & $8.2494\times10^5$\\
+9 & $Y_0^L,Y_0^U$ & $Y_0\pm\gamma\sqrt{Y_0/N_0}$ & $1.2466\times10^{-6}$,\ $2.7534\times10^{-6}$\\
+10 & $Q_u^{Z,L},Q_u^{Z,U}$ & $Q_u\pm\gamma\sqrt{Q_u/N_{uZ}}$ & $2.4835\times10^{-3}$,\ $2.5143\times10^{-3}$\\
+11 & $Q_v^{Z,L},Q_v^{Z,U}$ & $Q_v\pm\gamma\sqrt{Q_v/N_{vZ}}$ & $4.9213\times10^{-4}$,\ $5.1162\times10^{-4}$\\
+12 & $T_v^{X,U}$ & $T_v+\gamma\sqrt{T_v/N_{vX}}$ & $9.7661\times10^{-6}$\\
+13 & $P_1^u,P_2^u,P_0^u$ & $e^{-u}u^n/n!$ & $0.30327,\ 0.07582,\ 0.60653$\\
+14 & $P_1^v,P_2^v,P_0^v$ & $e^{-v}v^n/n!$ & $0.09048,\ 0.004524,\ 0.90484$\\
+15 & $\mathrm{den}$ & $P_1^vP_2^u-P_1^uP_2^v$ & $5.4881\times10^{-3}$\\
+16 & $\YoneZ,Y_1^{X,L}$ & 式 \eqref{eq:y1} & $4.6925\times10^{-3}$,\ $4.6925\times10^{-3}$\\
+17 & $\eoneX$ & 式 (3.29) & $2.1673\times10^{-2}$\\
+18 & $\Htwo(\eoneX)$ & $-\sum x\log_2x$ & $0.15074$\\
+19 & $\Htwo(E_u)$ & 同上 & $0.11470$\\
+20 & 收入 & $P_1^u\YoneZ(1-\Htwo(\eoneX))$ & $1.2086\times10^{-3}$\\
+21 & 支出 & $Q_uf\Htwo(E_u)$ & $3.3243\times10^{-4}$\\
+22 & 资格系数 & $P_uP_{Z\mid u}^{A}P_Z^{B}$ & $0.15$\\
+23 & $\bm{R}$ & 式 \eqref{eq:keyrate} & $\bm{1.3143\times10^{-4}}$\\
+\end{longtable}
+
+%======================================================================
+\section{常见误解}
+%======================================================================
+
+\paragraph{① “$N$ 不同，\code{fluct} 会重新算吗？”}
+不会。$N$ 不是 \code{fluct} 的输入；\code{fluct} 只看 \code{method} 和 \code{eps}。
+$N$ 是在调用 \code{D.Q(Q, Nl, nW)} 时才传进去的。
+\[
+N\text{ 不同}\;\Longrightarrow\;\text{缓存照样命中}\;\Longrightarrow\;
+\text{但 }D.Q\text{ 用新的 }N\text{ 重新算}\;\Longrightarrow\;\text{区间数值不同}.
+\]
+
+\paragraph{② $Q,E,T$ 是什么关系}
+\begin{align}
+Q&=P(\text{响应}),\\
+E&=P(\text{错}\mid\text{响应}),\\
+T&=P(\text{响应且错})=Q\,E.
+\end{align}
+$Q$ 管“响不响”；$E$ 管“响得对不对”；$T$ 是两者的联合概率。
+
+\paragraph{③ \code{p.P0} 和 $P_0^u$ 不是一回事}
+\begin{itemize}[leftmargin=1.6em]
+\item \code{p.P0}：Alice 选择发送真空态的概率（默认 0.1）；
+\item $P_0^u=e^{-u}$：信号态脉冲里零光子的比例（默认 0.6065）。
+\end{itemize}
+
+\paragraph{④ \code{g.eta} 和 \code{g.eta_u} 不是一回事}
+\begin{itemize}[leftmargin=1.6em]
+\item \code{g.eta}：一个光子的端到端透过率；
+\item \code{g.eta_u}：一个多光子脉冲里“至少有一个光子被探测到”的概率。
+\end{itemize}
+
+\paragraph{⑤ $T$ 是概率，不是个数}
+$T$ 是每个脉冲“既响应又出错”的概率。期望个数要乘脉冲数：$T N_l$。
+
+\paragraph{⑥ $Y_1,e_1$ 不是实验量}
+实验只能测 $Q,E$。$Y_1,e_1$ 是由诱骗态公式估出来的上下界，不是直接测量值。
+
+\paragraph{⑦ $v$ 不直接进最终密钥率公式}
+$v,P_v,P_{Z\mid v}$ 只参与 \code{estimate}，用来估 $Y_1,e_1$。
+最终 $R$ 公式里看不到 $v$，因为诱骗态本身不生成密钥，它的作用是“当参照物”。
+
+\paragraph{⑧ 优化不会污染原始参数}
+\code{rateFor} 里先 \code{q = p} 复制，再改 \code{q}。MATLAB 值语义保证调用方的
+\code{p} 不变。
+
+%======================================================================
+\section{代码索引与自检}
+%======================================================================
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+内容 & 位置\\
+\midrule
+参数表、$Y_0$、$P_0$ & \code{+qkd/params.m}\\
+透过率、增益、误码、误码计数 & \code{+qkd/gain.m}\\
+三种统计界、句柄工厂、缓存 & \code{+qkd/fluct.m}\\
+脉冲数、区间、式 (3.28)(3.29) & \code{+qkd/estimate.m}\\
+式 (3.30)、$\Htwo$、截断 & \code{+qkd/keyRateAt.m}\\
+距离扫描、三种优化模式、$L_{\max}$ & \code{+qkd/runCase.m}\\
+任务 1 脚本 & \code{tasks/run_task1.m}\\
+任务 2 脚本 & \code{tasks/run_task2.m}\\
+任务 3 脚本 & \code{tasks/run_task3.m}\\
+回归金标准 & \code{checks/runTests.m}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{建议的阅读顺序}
+
+\begin{enumerate}[leftmargin=1.8em]
+\item \code{params.m}：先知道有哪些参数；
+\item \code{gain.m}：理解“损耗 $\to$ 增益 $\to$ 误码”的模型；
+\item \code{keyRateAt.m}：看最终公式长什么样；
+\item \code{fluct.m}：理解“为什么要留余量”；
+\item \code{estimate.m}：最后啃诱骗态估计；
+\item \code{runCase.m}：看这些东西怎么串成曲线。
+\end{enumerate}
+
+\subsection*{自检}
+
+在 MATLAB 工程根目录：
+\begin{lstlisting}
+addpath(genpath(pwd));
+runTests      % 18 regression assertions
+selfTest      % print sampled values for tasks 1-3
+verify        % write results/verify.log
+\end{lstlisting}
+
+如果 \code{runTests} 全 PASS，说明本文描述的计算链与代码实现一致。
+
+%======================================================================
+\appendix
+\section{符号表}
+%======================================================================
+
+\begin{longtable}{@{}lll@{}}
+\toprule
+代码 & 数学 & 含义\\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\code{p.u} & $u$ & 信号态平均光子数\\
+\code{p.v} & $v$ & 诱骗态平均光子数\\
+\code{p.Pu} & $P_u$ & 信号态概率\\
+\code{p.Pv} & $P_v$ & 诱骗态概率\\
+\code{p.P0} & $P_0$ & 真空态概率\\
+\code{p.Y0} & $Y_0$ & 真空态响应率\\
+\code{p.Pza_u} & $P_{Z\mid u}^{A}$ & 信号态选 $Z$ 基概率\\
+\code{p.Pzb} & $P_Z^{B}$ & Bob 选 $Z$ 基概率\\
+\code{p.f} & $f$ & 纠错效率\\
+\code{p.alpha} & $\alpha$ & 光纤损耗\\
+\code{p.etad} & $\eta_d$ & 探测器效率\\
+\code{p.ed} & $e_d$ & 本底误码率\\
+\code{p.e0} & $e_0$ & 真空态误码率\\
+\code{g.eta} & $\eta$ & 端到端透过率\\
+\code{g.eta_u} & $1-e^{-\eta u}$ & 信号态至少探测到一个光子的概率\\
+\code{g.Qu} & $Q_u$ & 信号态增益\\
+\code{g.Eu} & $E_u$ & 信号态误码率\\
+\code{g.Tu} & $T_u$ & 信号态误码计数\\
+\code{P1u} & $P_1^u$ & 信号态单光子概率\\
+\code{P2u} & $P_2^u$ & 信号态双光子概率\\
+\code{P0u} & $P_0^u$ & 信号态零光子概率\\
+\code{Y1Lz} & $\YoneZ$ & $Z$ 基单光子响应率下界\\
+\code{Y1Lx} & $Y_1^{X,L}$ & $X$ 基单光子响应率下界\\
+\code{e1Ux} & $\eoneX$ & $X$ 基单光子误码率上界\\
+\code{den} & $P_1^vP_2^u-P_1^uP_2^v$ & 式 (3.28) 的分母\\
+\code{R} & $R$ & 安全密钥率（bit/pulse）\\
+\code{Lmax} & $L_{\max}$ & 最远成码距离（km）\\
+\end{longtable}
+
+\vfill
+\begin{center}
+\small
+编译说明：本文使用 \code{ctexart}，请用 \textbf{XeLaTeX} 编译。\\
+Overleaf：Menu $\to$ Compiler $\to$ XeLaTeX；本地：用 XeLaTeX 连续编译两次。
+\end{center}
+
+\end{document}
