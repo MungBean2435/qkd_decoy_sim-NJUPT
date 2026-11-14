@@ -38,7 +38,7 @@ function out = runCase(p, spec)
 %  一句话记住这个文件：它是「计算内核」和「画图/界面」之间唯一的接口。
 % ------------------------------------------------------------------------
 
-% 两个默认值：调用方懒得写的时候就按这个来（MATLAB 里很常见的写法）
+% 两个默认值：调用方懒得写的时候就按这个来
 if ~isfield(spec, 'eps') || isempty(spec.eps), spec.eps = 1e-7; end
 if ~isfield(spec, 'opt') || isempty(spec.opt), spec.opt = 'none'; end
 
@@ -83,14 +83,14 @@ switch lower(spec.opt)
     case 'u'
         % ============ 模式二：只优化信号态光强 u（任务 2）============
         % v、P_u、P_v 保持题目给定值，只问「这个距离上 u 取多少最好」。
-        % linspace 造出一串候选：lb 到 ub 之间均匀取 n 个，例如 0.10~1.30 取 61 个。
+        % linspace 造出一串候选：lb 到 ub 之间均匀取 n 个，例如 0.10~1.30 取 601 个。
         ug = linspace(spec.optU.lb, spec.optU.ub, spec.optU.n);
 
         if strcmpi(spec.optU.mode, 'perDistance')
             % 逐距离最优：每个距离点各挑各的 u。
             % 好处是这条曲线代表「该方法在最好情况下的性能」，也就是性能上限。
             for i = 1:n
-                % 一次把 61 个候选全算出来（向量化的威力：只调一次内核）
+                % 一次把 601 个候选全算出来（向量化的威力：只调一次内核）
                 Rv = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
                 [rmax, k] = max(Rv);   % 挑最大那个，k 是它在候选里的位置
                 out.R(i) = rmax;

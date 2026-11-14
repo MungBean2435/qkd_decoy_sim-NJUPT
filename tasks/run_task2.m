@@ -38,7 +38,7 @@ for k = 1:numel(meth)
     % 关键三行：method 选方法、opt='u' 表示只优化 u、optU 给出搜索范围
     spec = struct('method', meth{k}, 'N', N, 'eps', 1e-7, ...
                   'L', [0 300 1], 'opt', 'u', ...
-                  'optU', struct('lb', 0.10, 'ub', 1.30, 'n', 61, 'mode', 'perDistance'));
+                  'optU', struct('lb', 0.10, 'ub', 1.30, 'n', 601, 'mode', 'perDistance'));
     %   lb/ub：u 的搜索上下界（0.10 ~ 1.30，太大会有多光子风险）
     %   n    ：在区间里均匀取 61 个候选
     %   mode ：perDistance = 每个距离点各选最优（另一种是 fixed，全程统一）

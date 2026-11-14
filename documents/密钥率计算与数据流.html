@@ -1,0 +1,2966 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN" xml:lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="qkd_decoy_sim 学习文档" />
+  <title>三强度诱骗态 BB84 密钥率计算：需要什么、数据怎么得来、怎么流动</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+  :root { --accent:#005aa0; --ink:#1f2328; --muted:#5b6570; --line:#e3e8ef; --soft:#f6f8fb; }
+  html { scroll-behavior:smooth; }
+  body {
+    max-width: 980px; margin: 0 auto; padding: 2.6rem 1.4rem 5rem;
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 16px; line-height: 1.78; color: var(--ink);
+    background: #fff;
+  }
+  header#title-block-header { border-bottom: 1px solid var(--line); padding-bottom: 1.2rem; margin-bottom: 2rem; }
+  h1.title { font-size: 2rem; color: var(--accent); margin-bottom: .35rem; line-height: 1.3; }
+  p.subtitle { color: var(--muted); font-size: 1.05rem; }
+  h1, h2, h3, h4 { color: var(--accent); line-height: 1.35; margin-top: 2.1em; margin-bottom: .55em; }
+  h1 { font-size: 1.55rem; border-bottom: 2px solid var(--line); padding-bottom: .3rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.08rem; }
+  p { margin: .75em 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+    background: var(--soft); border: 1px solid var(--line);
+    border-radius: 4px; padding: .08em .35em; font-size: .9em;
+  }
+  pre {
+    background: var(--soft); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1rem 1.1rem; overflow-x: auto; line-height: 1.5;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: .9em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2em 0; font-size: .93em; }
+  th, td { border-bottom: 1px solid var(--line); padding: .48em .6em; vertical-align: top; }
+  th { background: #eef4fa; text-align: left; font-weight: 600; }
+  tbody tr:hover { background: #fbfcfe; }
+  blockquote {
+    margin: 1.2em 0; padding: .65em 1.1em;
+    border-left: 4px solid var(--accent); background: var(--soft);
+    color: #333; border-radius: 0 6px 6px 0;
+  }
+  #TOC {
+    background: var(--soft); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.2rem; margin: 1.5rem 0 2.5rem;
+  }
+  #TOC > ul { margin: .3rem 0; padding-left: 1.2rem; }
+  #TOC ul ul { padding-left: 1.1rem; }
+  #TOC li { margin: .22rem 0; }
+  figure { margin: 1.4em 0; }
+  figcaption { color: var(--muted); font-size: .9em; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+  @media (max-width: 640px) {
+    body { padding: 1.1rem .9rem 3rem; font-size: 15px; }
+    table { font-size: .84em; }
+    pre { padding: .7rem; }
+  }
+  @media print {
+    body { max-width: none; padding: 0; font-size: 11pt; }
+    #TOC { break-after: page; }
+    a { color: inherit; }
+  }
+  </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">三强度诱骗态 BB84
+密钥率计算：需要什么、数据怎么得来、怎么流动</h1>
+<p class="author">qkd_decoy_sim 学习文档</p>
+<p class="date">2026 年 11 月</p>
+<div class="abstract">
+<div class="abstract-title">摘要</div>
+<p>本文回答三个问题：算一条密钥率曲线到底需要哪些量；每个量从哪一步、用什么公式得到；
+这些量按什么顺序流过程序。全文以任务 1（高斯统计界、不优化）为主线，
+任务 2、3 单独成节，重点讲优化算法；公式与代码一一对应。
+阅读对象是第一次接触本工程、对 MATLAB
+与量子密钥分发都还不熟悉的读者。</p>
+</div>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#结论先行" id="toc-结论先行">结论先行</a></li>
+<li><a href="#密钥率公式最终需要哪些量"
+id="toc-密钥率公式最终需要哪些量">密钥率公式：最终需要哪些量</a></li>
+<li><a href="#总体数据流五层"
+id="toc-总体数据流五层">总体数据流：五层</a></li>
+<li><a href="#第-1-层参数层-codeparams.mcode"
+id="toc-第-1-层参数层-codeparams.mcode">第 1 层：参数层
+<code>params.m</code></a>
+<ul>
+<li><a href="#题目给定的参数"
+id="toc-题目给定的参数">题目给定的参数</a></li>
+<li><a href="#两个派生量" id="toc-两个派生量">两个派生量</a></li>
+<li><a href="#参数在哪一层被用到"
+id="toc-参数在哪一层被用到">参数在哪一层被用到</a></li>
+</ul></li>
+<li><a href="#第-2-层物理层-codegain.mcode"
+id="toc-第-2-层物理层-codegain.mcode">第 2 层：物理层
+<code>gain.m</code></a>
+<ul>
+<li><a href="#端到端透过率" id="toc-端到端透过率">端到端透过率</a></li>
+<li><a href="#至少收到一个光子的概率"
+id="toc-至少收到一个光子的概率">“至少收到一个光子”的概率</a></li>
+<li><a href="#增益-q" id="toc-增益-q">增益 <span
+class="math inline">\(Q\)</span></a></li>
+<li><a href="#误码率-e" id="toc-误码率-e">误码率 <span
+class="math inline">\(E\)</span></a></li>
+<li><a href="#误码计数-t" id="toc-误码计数-t">误码计数 <span
+class="math inline">\(T\)</span></a></li>
+<li><a href="#为什么-codegaincode-不含-n"
+id="toc-为什么-codegaincode-不含-n">为什么 <code>gain</code>
+不含 <span class="math inline">\(N\)</span></a></li>
+<li><a href="#km-数值例子" id="toc-km-数值例子">100 km 数值例子</a></li>
+</ul></li>
+<li><a href="#第-3-层统计层-codefluct.mcode"
+id="toc-第-3-层统计层-codefluct.mcode">第 3 层：统计层
+<code>fluct.m</code></a>
+<ul>
+<li><a href="#为什么需要这一层"
+id="toc-为什么需要这一层">为什么需要这一层</a></li>
+<li><a href="#返回的是函数不是数"
+id="toc-返回的是函数不是数">返回的是函数，不是数</a></li>
+<li><a href="#三种方法" id="toc-三种方法">三种方法</a></li>
+<li><a href="#高斯界的-gamma-怎么来"
+id="toc-高斯界的-gamma-怎么来">高斯界的 <span
+class="math inline">\(\gamma\)</span> 怎么来</a></li>
+<li><a href="#切尔诺夫界为什么上下不对称"
+id="toc-切尔诺夫界为什么上下不对称">切尔诺夫界为什么上下不对称</a></li>
+</ul></li>
+<li><a href="#第-4-层估计层-codeestimate.mcode"
+id="toc-第-4-层估计层-codeestimate.mcode">第 4 层：估计层
+<code>estimate.m</code></a>
+<ul>
+<li><a href="#为什么不能直接算-y_1e_1"
+id="toc-为什么不能直接算-y_1e_1">为什么不能直接算 <span
+class="math inline">\(Y_1,e_1\)</span></a></li>
+<li><a href="#第一步算脉冲数"
+id="toc-第一步算脉冲数">第一步：算脉冲数</a></li>
+<li><a href="#第二步真空态响应率的上下界"
+id="toc-第二步真空态响应率的上下界">第二步：真空态响应率的上下界</a></li>
+<li><a href="#第三步z-基增益的上下界"
+id="toc-第三步z-基增益的上下界">第三步：<span
+class="math inline">\(Z\)</span> 基增益的上下界</a></li>
+<li><a href="#第四步x-基同样处理"
+id="toc-第四步x-基同样处理">第四步：<span
+class="math inline">\(X\)</span> 基同样处理</a></li>
+<li><a href="#第五步泊松项"
+id="toc-第五步泊松项">第五步：泊松项</a></li>
+<li><a href="#公式-3.28单光子响应率下界"
+id="toc-公式-3.28单光子响应率下界">公式
+(3.28)：单光子响应率下界</a></li>
+<li><a href="#公式推导思路" id="toc-公式推导思路">公式推导思路</a></li>
+<li><a href="#公式-3.29单光子误码率上界"
+id="toc-公式-3.29单光子误码率上界">公式
+(3.29)：单光子误码率上界</a></li>
+<li><a href="#估不出来时直接认输"
+id="toc-估不出来时直接认输">估不出来时直接认输</a></li>
+<li><a href="#km-数值例子-1" id="toc-km-数值例子-1">100 km
+数值例子</a></li>
+</ul></li>
+<li><a href="#第-5-层密钥率层-codekeyrateat.mcode"
+id="toc-第-5-层密钥率层-codekeyrateat.mcode">第 5 层：密钥率层
+<code>keyRateAt.m</code></a>
+<ul>
+<li><a href="#信号态单光子概率"
+id="toc-信号态单光子概率">信号态单光子概率</a></li>
+<li><a href="#二进制熵" id="toc-二进制熵">二进制熵</a></li>
+<li><a href="#收入与支出" id="toc-收入与支出">收入与支出</a></li>
+<li><a href="#截断" id="toc-截断">截断</a></li>
+<li><a href="#km-结果" id="toc-km-结果">100 km 结果</a></li>
+</ul></li>
+<li><a href="#调度层coderuncase.mcode-与-codetaskscode"
+id="toc-调度层coderuncase.mcode-与-codetaskscode">调度层：<code>runCase.m</code>
+与 <code>tasks/</code></a>
+<ul>
+<li><a href="#coderuncasecode-做的事"
+id="toc-coderuncasecode-做的事"><code>runCase</code>
+做的事</a></li>
+<li><a href="#coderateforcode把参数写回表"
+id="toc-coderateforcode把参数写回表"><code>rateFor</code>：把参数写回表</a></li>
+<li><a href="#最远成码距离" id="toc-最远成码距离">最远成码距离</a></li>
+<li><a href="#任务脚本只负责三件事"
+id="toc-任务脚本只负责三件事">任务脚本只负责三件事</a></li>
+</ul></li>
+<li><a href="#任务-2一维网格搜索只优化信号态光强-u"
+id="toc-任务-2一维网格搜索只优化信号态光强-u">任务
+2：一维网格搜索（只优化信号态光强 <span
+class="math inline">\(u\)</span>）</a>
+<ul>
+<li><a href="#任务目标与调用链"
+id="toc-任务目标与调用链">任务目标与调用链</a></li>
+<li><a href="#优化模型" id="toc-优化模型">优化模型</a></li>
+<li><a href="#代码实现" id="toc-代码实现">代码实现</a></li>
+<li><a href="#另一种模式整段统一-u"
+id="toc-另一种模式整段统一-u">另一种模式：整段统一 <span
+class="math inline">\(u\)</span></a></li>
+<li><a href="#复杂度精度与一个注释不一致"
+id="toc-复杂度精度与一个注释不一致">复杂度、精度与一个注释不一致</a></li>
+<li><a href="#物理读图ul-为什么随距离下降"
+id="toc-物理读图ul-为什么随距离下降">物理读图：<span
+class="math inline">\(u^*(L)\)</span> 为什么随距离下降</a></li>
+</ul></li>
+<li><a href="#任务-3四维全局优化差分进化-坐标下降"
+id="toc-任务-3四维全局优化差分进化-坐标下降">任务
+3：四维全局优化（差分进化 + 坐标下降）</a>
+<ul>
+<li><a href="#任务目标" id="toc-任务目标">任务目标</a></li>
+<li><a href="#为什么不能继续网格搜索"
+id="toc-为什么不能继续网格搜索">为什么不能继续网格搜索</a></li>
+<li><a href="#优化变量边界与约束"
+id="toc-优化变量边界与约束">优化变量、边界与约束</a></li>
+<li><a href="#外层5-km-粗网格" id="toc-外层5-km-粗网格">外层：5 km
+粗网格</a></li>
+<li><a href="#内层差分进化"
+id="toc-内层差分进化">内层：差分进化</a></li>
+<li><a href="#可复现性与两个实现细节"
+id="toc-可复现性与两个实现细节">可复现性与两个实现细节</a></li>
+<li><a href="#局部打磨坐标下降"
+id="toc-局部打磨坐标下降">局部打磨：坐标下降</a></li>
+<li><a href="#回到-1-km插值参数不插值曲线"
+id="toc-回到-1-km插值参数不插值曲线">回到 1
+km：插值参数，不插值曲线</a></li>
+<li><a href="#断崖区细化" id="toc-断崖区细化">断崖区细化</a></li>
+<li><a href="#收尾无密钥区的参数"
+id="toc-收尾无密钥区的参数">收尾：无密钥区的参数</a></li>
+<li><a href="#复杂度与设计取舍"
+id="toc-复杂度与设计取舍">复杂度与设计取舍</a></li>
+<li><a href="#物理读图四个最优参数为什么随距离漂移"
+id="toc-物理读图四个最优参数为什么随距离漂移">物理读图：四个最优参数为什么随距离漂移</a></li>
+</ul></li>
+<li><a href="#完整链路与端到端数值示例"
+id="toc-完整链路与端到端数值示例">完整链路与端到端数值示例</a>
+<ul>
+<li><a href="#公式链" id="toc-公式链">公式链</a></li>
+<li><a href="#函数调用栈" id="toc-函数调用栈">函数调用栈</a></li>
+<li><a href="#数据形状" id="toc-数据形状">数据形状</a></li>
+<li><a href="#km-端到端示例" id="toc-km-端到端示例">100 km
+端到端示例</a></li>
+</ul></li>
+<li><a href="#常见误解" id="toc-常见误解">常见误解</a></li>
+<li><a href="#代码索引与自检" id="toc-代码索引与自检">代码索引与自检</a>
+<ul>
+<li><a href="#建议的阅读顺序"
+id="toc-建议的阅读顺序">建议的阅读顺序</a></li>
+<li><a href="#自检" id="toc-自检">自检</a></li>
+</ul></li>
+<li><a href="#符号表" id="toc-符号表">符号表</a></li>
+</ul>
+</nav>
+<h1 id="结论先行">结论先行</h1>
+<p>一条密钥率曲线的计算链只有四步：</p>
+<div class="center">
+<table>
+<tbody>
+<tr>
+<td style="text-align: center;"><strong>题目参数</strong>
+<code>p</code></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(\Downarrow\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>第 1 步：物理层</strong>
+<code>gain.m</code> 把物理参数变成可观测量 <span
+class="math inline">\(Q,E,T\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(\Downarrow\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>第 2 步：统计层</strong>
+<code>fluct.m</code> 给可观测量配上统计置信区间</td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(\Downarrow\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>第 3 步：估计层</strong>
+<code>estimate.m</code> 反推单光子参数的安全界 <span
+class="math inline">\(Y_1^{Z,L},e_1^{X,U}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(\Downarrow\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><strong>第 4 步：密钥率层</strong>
+<code>keyRateAt.m</code> 拼成安全密钥率 <span
+class="math inline">\(R\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code>runCase.m</code>
+只是把上面四步按距离逐点调用，并整理成数组： <span
+class="math display">\[R(L)=\bigl[\;R(L_1),\;R(L_2),\;\ldots,\;R(L_{301})\;\bigr].\]</span></p>
+<div class="center">
+
+</div>
+<h1 id="密钥率公式最终需要哪些量">密钥率公式：最终需要哪些量</h1>
+<p>代码在 <code>+qkd/keyRateAt.m</code> 第 58–59 行：</p>
+<pre><code>R = p.Pu .* p.Pza_u .* p.Pzb .* ...
+    (d.P1u .* Y1Lz .* (1 - H2(e1Ux)) - d.Qu .* p.f .* H2(d.Eu));</code></pre>
+<p>写成公式： <span class="math display">\[R=P_u\,P_{Z\mid
+u}^{A}\,P_Z^{B}
+\left[
+P_1^u\,Y_1^{Z,L}\left(1-H_2\!\left(e_1^{X,U}\right)\right)
+-Q_u\,f\,H_2(E_u)
+\right].\]</span></p>
+<p>逐项拆开：</p>
+<table style="width:90%;">
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 17%" />
+<col style="width: 38%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">项</th>
+<th style="text-align: left;">代码</th>
+<th style="text-align: left;">含义</th>
+<th style="text-align: left;">从哪来</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_u\)</span></td>
+<td style="text-align: left;"><code>p.Pu</code></td>
+<td style="text-align: left;">信号态选择概率</td>
+<td style="text-align: left;"><code>params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(P_{Z\mid
+u}^{A}\)</span></td>
+<td style="text-align: left;"><code>p.Pza_u</code></td>
+<td style="text-align: left;">信号态下 Alice 选 <span
+class="math inline">\(Z\)</span> 基的概率</td>
+<td style="text-align: left;"><code>params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_Z^{B}\)</span></td>
+<td style="text-align: left;"><code>p.Pzb</code></td>
+<td style="text-align: left;">Bob 选 <span
+class="math inline">\(Z\)</span> 基的概率</td>
+<td style="text-align: left;"><code>params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^u\)</span></td>
+<td style="text-align: left;"><code>d.P1u</code></td>
+<td style="text-align: left;">信号态脉冲恰好含 1 个光子的概率</td>
+<td style="text-align: left;">由 <span class="math inline">\(u\)</span>
+算泊松</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{Z,L}\)</span></td>
+<td style="text-align: left;"><code>Y1Lz</code></td>
+<td style="text-align: left;"><span class="math inline">\(Z\)</span>
+基单光子响应率的<strong>下界</strong></td>
+<td style="text-align: left;"><code>estimate.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(e_1^{X,U}\)</span></td>
+<td style="text-align: left;"><code>e1Ux</code></td>
+<td style="text-align: left;"><span class="math inline">\(X\)</span>
+基单光子误码率的<strong>上界</strong></td>
+<td style="text-align: left;"><code>estimate.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u\)</span></td>
+<td style="text-align: left;"><code>d.Qu</code></td>
+<td style="text-align: left;">信号态增益</td>
+<td style="text-align: left;"><code>gain.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(f\)</span></td>
+<td style="text-align: left;"><code>p.f</code></td>
+<td style="text-align: left;">纠错效率</td>
+<td style="text-align: left;"><code>params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(E_u\)</span></td>
+<td style="text-align: left;"><code>d.Eu</code></td>
+<td style="text-align: left;">信号态误码率</td>
+<td style="text-align: left;"><code>gain.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(H_2(\cdot)\)</span></td>
+<td style="text-align: left;">匿名函数</td>
+<td style="text-align: left;">二进制熵</td>
+<td style="text-align: left;"><code>keyRateAt.m</code>
+内定义</td>
+</tr>
+</tbody>
+</table>
+<h4 id="关键观察.">关键观察.</h4>
+<p>公式里只有 <span class="math inline">\(Q_u\)</span> 和 <span
+class="math inline">\(E_u\)</span> 是信道模型直接给出的；<span
+class="math inline">\(Y_1\)</span> 和 <span
+class="math inline">\(e_1\)</span> 永远测不到， 必须由
+<code>estimate.m</code> 用诱骗态数据反推上下界。而估计 <span
+class="math inline">\(Y_1,e_1\)</span> 又需要 <span
+class="math inline">\(Q_v,T_v,Y_0\)</span>——所以
+<code>gain.m</code> 才要算一整套，而不是只算 <span
+class="math inline">\(Q_u,E_u\)</span>。</p>
+<h1 id="总体数据流五层">总体数据流：五层</h1>
+<div class="center">
+<table style="width:86%;">
+<colgroup>
+<col style="width: 86%" />
+</colgroup>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>第 1 层：参数层</strong>
+<code>+qkd/params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\alpha,\eta_d,d,e_d,e_0,u,v,P_u,P_v,P_{Z\mid
+u},P_Z,f\)</span>； 派生 <span
+class="math inline">\(Y_0=2d(1-d)\)</span>，<span
+class="math inline">\(P_0=1-P_u-P_v\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>第 2 层：物理层</strong>
+<code>+qkd/gain.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\eta\to\eta_u,\eta_v\to Q_u,Q_v\to E_u,E_v\to
+T_u,T_v\)</span>；输出全是“每个脉冲的概率”</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>第 3 层：统计层</strong>
+<code>+qkd/fluct.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">按
+<code>method</code>、<code>eps</code>
+返回三个界限函数 <span class="math inline">\(D.Q\)</span>、<span
+class="math inline">\(D.T\)</span>、<span
+class="math inline">\(D.Y_0\)</span>； 把“点估计 <span
+class="math inline">\(\pm\)</span> 偏差”变成“置信区间”</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>第 4 层：估计层</strong>
+<code>+qkd/estimate.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">脉冲数 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(Q/T/Y_0\)</span> 的上下界 <span
+class="math inline">\(\to\)</span> 泊松项 <span
+class="math inline">\(\to\)</span> 式 (3.28)(3.29)； 输出 <span
+class="math inline">\(Y_1^{Z,L}\)</span>（下界）、<span
+class="math inline">\(e_1^{X,U}\)</span>（上界）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>第 5 层：密钥率层</strong>
+<code>+qkd/keyRateAt.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(H_2\to\)</span> 收入/支出 <span
+class="math inline">\(\to R\)</span>；负数/NaN 截成 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>调度层</strong>
+<code>+qkd/runCase.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">逐距离调用 <span class="math inline">\(\to
+R(L)\to L_{\max}\to\)</span> 返回给 <code>tasks/</code>
+画图</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>各层职责如下：</p>
+<table style="width:87%;">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 22%" />
+<col style="width: 15%" />
+<col style="width: 25%" />
+<col style="width: 15%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">层</th>
+<th style="text-align: left;">文件</th>
+<th style="text-align: left;">输入</th>
+<th style="text-align: left;">输出</th>
+<th style="text-align: left;">是否含公式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">参数</td>
+<td style="text-align: left;"><code>params.m</code></td>
+<td style="text-align: left;">无</td>
+<td style="text-align: left;"><code>p</code></td>
+<td style="text-align: left;">只有参数定义</td>
+</tr>
+<tr>
+<td style="text-align: left;">物理</td>
+<td style="text-align: left;"><code>gain.m</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(p,L\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(g\)</span>（<span
+class="math inline">\(Q,E,T\)</span>）</td>
+<td style="text-align: left;">是</td>
+</tr>
+<tr>
+<td style="text-align: left;">统计</td>
+<td style="text-align: left;"><code>fluct.m</code></td>
+<td
+style="text-align: left;"><code>method</code>,<code>eps</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(D\)</span>（三个句柄）</td>
+<td style="text-align: left;">统计界公式</td>
+</tr>
+<tr>
+<td style="text-align: left;">估计</td>
+<td style="text-align: left;"><code>estimate.m</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(p,L,\text{spec}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{Z,L},e_1^{X,U},d\)</span></td>
+<td style="text-align: left;">是</td>
+</tr>
+<tr>
+<td style="text-align: left;">密钥率</td>
+<td style="text-align: left;"><code>keyRateAt.m</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(p,L,\text{spec}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(R,d\)</span></td>
+<td style="text-align: left;">是</td>
+</tr>
+<tr>
+<td style="text-align: left;">调度</td>
+<td style="text-align: left;"><code>runCase.m</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(p,\text{spec}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(L,R,L_{\max}\)</span></td>
+<td style="text-align: left;">否</td>
+</tr>
+<tr>
+<td style="text-align: left;">出图</td>
+<td
+style="text-align: left;"><code>tasks/run_task*.m</code></td>
+<td style="text-align: left;">无</td>
+<td style="text-align: left;">PNG/CSV</td>
+<td style="text-align: left;">否</td>
+</tr>
+</tbody>
+</table>
+<h1 id="第-1-层参数层-codeparams.mcode">第 1 层：参数层
+<code>params.m</code></h1>
+<h2 id="题目给定的参数">题目给定的参数</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">代码字段</th>
+<th style="text-align: left;">符号</th>
+<th style="text-align: left;">含义</th>
+<th style="text-align: right;">默认值</th>
+<th style="text-align: right;">单位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>p.u</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(u\)</span></td>
+<td style="text-align: left;">信号态平均光子数</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">个/脉冲</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.v</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(v\)</span></td>
+<td style="text-align: left;">诱骗态平均光子数</td>
+<td style="text-align: right;">0.1</td>
+<td style="text-align: right;">个/脉冲</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pu</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_u\)</span></td>
+<td style="text-align: left;">信号态选择概率</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pv</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_v\)</span></td>
+<td style="text-align: left;">诱骗态选择概率</td>
+<td style="text-align: right;">0.3</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pza_u</code></td>
+<td style="text-align: left;"><span class="math inline">\(P_{Z\mid
+u}^{A}\)</span></td>
+<td style="text-align: left;">信号态下 Alice 选 <span
+class="math inline">\(Z\)</span> 基</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pza_v</code></td>
+<td style="text-align: left;"><span class="math inline">\(P_{Z\mid
+v}^{A}\)</span></td>
+<td style="text-align: left;">诱骗态下 Alice 选 <span
+class="math inline">\(Z\)</span> 基</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pzb</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_Z^{B}\)</span></td>
+<td style="text-align: left;">Bob 选 <span
+class="math inline">\(Z\)</span> 基</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.f</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(f\)</span></td>
+<td style="text-align: left;">纠错效率</td>
+<td style="text-align: right;">1.16</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.alpha</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(\alpha\)</span></td>
+<td style="text-align: left;">光纤损耗</td>
+<td style="text-align: right;">0.2</td>
+<td style="text-align: right;">dB/km</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.etad</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_d\)</span></td>
+<td style="text-align: left;">探测器效率</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.d</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(d\)</span></td>
+<td style="text-align: left;">单探测器暗计数</td>
+<td style="text-align: right;"><span
+class="math inline">\(10^{-6}\)</span></td>
+<td style="text-align: right;">每脉冲</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.ed</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(e_d\)</span></td>
+<td style="text-align: left;">本底误码率</td>
+<td style="text-align: right;">0.015</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.e0</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(e_0\)</span></td>
+<td style="text-align: left;">真空态误码率（瞎猜）</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="两个派生量">两个派生量</h2>
+<p><strong>真空态响应率：</strong> <span
+class="math display">\[Y_0=2d(1-d).\]</span> Bob
+有两个探测器，任一“瞎响”都算响应： <span
+class="math display">\[1-(1-d)^2=2d-d^2=2d(1-d).\]</span> 默认 <span
+class="math inline">\(d=10^{-6}\)</span> 时，<span
+class="math inline">\(Y_0\approx 2\times10^{-6}\)</span>。</p>
+<p><strong>真空态选择概率：</strong> <span
+class="math display">\[P_0=1-P_u-P_v.\]</span> 默认 <span
+class="math inline">\(1-0.6-0.3=0.1\)</span>。</p>
+<blockquote>
+<p><strong>注意：</strong> 两个“真空”不要混：</p>
+<ul>
+<li><p><code>p.P0</code> <span
+class="math inline">\(=0.1\)</span>：Alice
+<strong>选择发送真空态脉冲</strong>的概率；</p></li>
+<li><p><span
+class="math inline">\(P_0^u=e^{-u}\)</span>：<strong>信号态脉冲里恰好含
+0 个光子</strong>的概率。</p></li>
+</ul>
+<p>前者决定“真空样本有多少个”，后者出现在诱骗态公式里。</p>
+</blockquote>
+<h2 id="参数在哪一层被用到">参数在哪一层被用到</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">参数</th>
+<th style="text-align: center;"><code>gain</code></th>
+<th style="text-align: center;"><code>estimate</code></th>
+<th style="text-align: center;"><code>keyRateAt</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(u,v\)</span></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"><span
+class="math inline">\(u\)</span>（算 <span
+class="math inline">\(P_1^u\)</span>）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_u,P_v,P_0\)</span></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓（算脉冲数）</td>
+<td style="text-align: center;"><span
+class="math inline">\(P_u\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(P_{Z\mid
+u},P_{Z\mid v}\)</span></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"><span class="math inline">\(P_{Z\mid
+u}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_Z^{B}\)</span></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\alpha,\eta_d\)</span></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(d\to
+Y_0\)</span></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(e_d,e_0\)</span></td>
+<td style="text-align: center;">✓（<span
+class="math inline">\(E\)</span>）</td>
+<td style="text-align: center;"><span
+class="math inline">\(e_0\)</span>（<span
+class="math inline">\(e_1\)</span> 公式）</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(f\)</span></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="第-2-层物理层-codegain.mcode">第 2 层：物理层
+<code>gain.m</code></h1>
+<p><code>gain</code> 只算每个脉冲的概率，不管脉冲数。</p>
+<h2 id="端到端透过率">端到端透过率</h2>
+<pre><code>g.eta = p.etad .* 10 .^ (-p.alpha .* L ./ 10);</code></pre>
+<p><span class="math display">\[\eta=\eta_d\,10^{-\alpha
+L/10}.\]</span></p>
+<p>推导：光纤每公里损耗 <span class="math inline">\(\alpha\)</span>
+dB，走 <span class="math inline">\(L\)</span> 公里共损耗 <span
+class="math inline">\(\alpha L\)</span> dB； dB 转功率比为 <span
+class="math inline">\(10^{-\alpha L/10}\)</span>；再乘探测器效率 <span
+class="math inline">\(\eta_d\)</span>。</p>
+<p>例：<span class="math inline">\(\alpha=0.2\)</span>、<span
+class="math inline">\(L=100\)</span> 时 <span
+class="math display">\[\alpha L=20\ \text{dB},\qquad
+10^{-20/10}=10^{-2}=0.01,\qquad
+\eta=0.5\times0.01=0.005.\]</span> 意思：光走 100
+km，再乘探测器效率，一千个光子里约 5 个能被探测到。</p>
+<h2 id="至少收到一个光子的概率">“至少收到一个光子”的概率</h2>
+<pre><code>g.eta_u = 1 - exp(-g.eta .* p.u);
+g.eta_v = 1 - exp(-g.eta .* p.v);</code></pre>
+<p>弱相干光源的光子数服从泊松分布，平均光子数为 <span
+class="math inline">\(\eta l\)</span>。一个都没收到的概率为 <span
+class="math inline">\(e^{-\eta l}\)</span>，所以至少收到一个： <span
+class="math display">\[P(\ge 1)=1-e^{-\eta l}.\]</span></p>
+<p>例（<span class="math inline">\(\eta=0.005\)</span>）：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">强度</th>
+<th style="text-align: right;">计算</th>
+<th style="text-align: right;">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(u=0.5\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1-e^{-0.0025}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.496878\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(v=0.1\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1-e^{-0.0005}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.998750\times10^{-4}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>注意：</strong> <code>g.eta_u</code> 不是“<span
+class="math inline">\(u\)</span> 的透过率”，而是“光强 <span
+class="math inline">\(u\)</span> 的脉冲至少被探测到一个光子的概率”。
+真正的透过率是 <code>g.eta</code>。</p>
+</blockquote>
+<h2 id="增益-q">增益 <span class="math inline">\(Q\)</span></h2>
+<pre><code>g.Qu = p.Y0 + g.eta_u;
+g.Qv = p.Y0 + g.eta_v;</code></pre>
+<p><span class="math display">\[Q_l=Y_0+\left(1-e^{-\eta
+l}\right).\]</span></p>
+<p>两项相加的原因：没有真实光子时，探测器可能自己瞎响（<span
+class="math inline">\(Y_0\)</span>）；有真实光子时，可能被探测到 （<span
+class="math inline">\(1-e^{-\eta
+l}\)</span>）。所以总响应概率是两者之和，且物理上 <span
+class="math inline">\(Q_l\ge Y_0\)</span>。</p>
+<h2 id="误码率-e">误码率 <span class="math inline">\(E\)</span></h2>
+<pre><code>g.Eu = (p.e0 .* p.Y0 + p.ed .* g.eta_u) ./ g.Qu;
+g.Ev = (p.e0 .* p.Y0 + p.ed .* g.eta_v) ./ g.Qv;</code></pre>
+<p><span class="math display">\[E_l=\frac{e_0Y_0+e_d\left(1-e^{-\eta
+l}\right)}{Q_l}.\]</span></p>
+<p>分子是“错的概率”：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">来源</th>
+<th style="text-align: left;">概率</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">暗计数猜错</td>
+<td style="text-align: left;"><span
+class="math inline">\(e_0Y_0\)</span></td>
+<td style="text-align: left;">没收到光子，只能瞎猜，错一半</td>
+</tr>
+<tr>
+<td style="text-align: left;">真实光子判错</td>
+<td style="text-align: left;"><span class="math inline">\(e_d(1-e^{-\eta
+l})\)</span></td>
+<td style="text-align: left;">器件/对准不完美</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>分母是“响的概率”<span class="math inline">\(Q_l\)</span>，所以 <span
+class="math inline">\(E_l\)</span>
+是条件概率：在响了的脉冲里，错的比例。</p>
+<h2 id="误码计数-t">误码计数 <span class="math inline">\(T\)</span></h2>
+<pre><code>g.Tu = g.Eu .* g.Qu;
+g.Tv = g.Ev .* g.Qv;</code></pre>
+<p><span
+class="math display">\[T_l=E_lQ_l=P(\text{响应且出错}).\]</span></p>
+<p>它和 <span class="math inline">\(E\)</span> 的区别：<span
+class="math inline">\(E=P(\text{错}\mid\text{响应})\)</span>，<span
+class="math inline">\(T=P(\text{响应且错})\)</span>。 <span
+class="math inline">\(T\)</span>
+是联合概率，不是“个数”。真正的期望错误个数是 <span
+class="math inline">\(T N_l\)</span>。</p>
+<h2 id="为什么-codegaincode-不含-n">为什么 <code>gain</code>
+不含 <span class="math inline">\(N\)</span></h2>
+<p><span class="math inline">\(Q,E,T\)</span>
+都是每个脉冲的比例。脉冲数要到 <code>estimate</code>
+里才出现： <span class="math display">\[N_{uZ}=P_uP_{Z\mid u}N,\qquad
+n_{Wz}=N_{uZ}Q_u+N_{vZ}Q_v.\]</span>
+这样分层的好处：换光纤、换探测器只改
+<code>gain</code>；换脉冲数只在
+<code>estimate</code> 乘一下。</p>
+<h2 id="km-数值例子">100 km 数值例子</h2>
+<p>参数：<span class="math inline">\(\alpha=0.2\)</span>，<span
+class="math inline">\(\eta_d=0.5\)</span>，<span
+class="math inline">\(u=0.5\)</span>，<span
+class="math inline">\(v=0.1\)</span>，<span
+class="math inline">\(d=10^{-6}\)</span>， <span
+class="math inline">\(e_d=0.015\)</span>，<span
+class="math inline">\(e_0=0.5\)</span>。</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: left;">公式</th>
+<th style="text-align: right;">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\eta\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_d10^{-\alpha L/10}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(5.000000\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_u\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(1-e^{-0.005\times0.5}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.496878\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(1-e^{-0.005\times0.1}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.998750\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0+\eta_u\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.498878\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0+\eta_v\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(5.018750\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(E_u\)</span></td>
+<td style="text-align: left;">上式</td>
+<td style="text-align: right;"><span
+class="math inline">\(1.538824\times10^{-2}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(E_v\)</span></td>
+<td style="text-align: left;">上式</td>
+<td style="text-align: right;"><span
+class="math inline">\(1.693284\times10^{-2}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(T_u\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(E_uQ_u\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.845316\times10^{-5}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(T_v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(E_vQ_v\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(8.498124\times10^{-6}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="第-3-层统计层-codefluct.mcode">第 3 层：统计层
+<code>fluct.m</code></h1>
+<h2 id="为什么需要这一层">为什么需要这一层</h2>
+<p>真实系统只能发有限个脉冲（题目里 <span
+class="math inline">\(10^8\sim10^{10}\)</span>）。用有限样本估出来的
+<span class="math inline">\(Q^*,T^*\)</span>
+和真值有偏差。安全分析必须给出： <span class="math display">\[\text{我有
+}1-\varepsilon\text{ 的把握，真值落在 }[\text{下界},\text{上界}]\text{
+内}.\]</span> <span class="math inline">\(\varepsilon=10^{-7}\)</span>
+表示“说错的概率千万分之一”。</p>
+<h2 id="返回的是函数不是数">返回的是函数，不是数</h2>
+<pre><code>D = qkd.fluct(method, eps);
+
+[lo, hi] = D.Q (Q,  Nl, nW);
+[lo, hi] = D.T (T,  Nl, nW);
+[lo, hi] = D.Y0(Y0, N0);</code></pre>
+<ul>
+<li><p><span
+class="math inline">\(N_l\)</span>：这个强度在这个基里发了多少脉冲；</p></li>
+<li><p><span
+class="math inline">\(n_W\)</span>：这个基里所有强度一共收到多少事件（霍夫丁要用）；</p></li>
+<li><p><span class="math inline">\(N_0\)</span>：真空态脉冲数。</p></li>
+</ul>
+<p><span class="math inline">\(N\)</span> 不在
+<code>fluct</code> 的输入里，而是在调用
+<code>D.Q</code> 时传进去。所以同一个 <span
+class="math inline">\(D\)</span> 可以服务多个 <span
+class="math inline">\(N\)</span>，缓存只看
+<code>method</code> 和 <code>eps</code>。</p>
+<h2 id="三种方法">三种方法</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">方法</th>
+<th style="text-align: left;">偏差公式</th>
+<th style="text-align: left;"><span
+class="math inline">\(\varepsilon=10^{-7}\)</span> 时的系数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">高斯</td>
+<td style="text-align: left;"><span
+class="math inline">\(\Delta=\gamma\sqrt{x/N}\)</span>，<span
+class="math inline">\(\gamma=\sqrt{2}\,\mathrm{erfc}^{-1}(\varepsilon)\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\gamma\approx5.327\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">霍夫丁</td>
+<td style="text-align: left;"><span
+class="math inline">\(\Delta=\sqrt{n_W\ln(1/\varepsilon)/2}\,/N\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(k=\sqrt{0.5\ln(1/\varepsilon)}\approx2.839\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">切尔诺夫（下界）</td>
+<td style="text-align: left;"><span
+class="math inline">\(\Delta=\sqrt{2x\ln(16/\varepsilon^4)}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\approx11.60\sqrt{x}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">切尔诺夫（上界）</td>
+<td style="text-align: left;"><span
+class="math inline">\(\widehat{\Delta}=\sqrt{2x\ln(\varepsilon^{-1.5})}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\approx6.95\sqrt{x}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>表中高斯/霍夫丁的 <span class="math inline">\(x\)</span>
+是比例（<span class="math inline">\(Q\)</span> 或 <span
+class="math inline">\(T\)</span>），切尔诺夫两式的 <span
+class="math inline">\(x\)</span> 是计数 <span
+class="math inline">\(x=N_lQ_l\)</span>。</p>
+<p>三种方法的共同形式： <span
+class="math display">\[\mathrm{lo}=\max(\text{点估计}-\Delta,0),\qquad
+\mathrm{hi}=\text{点估计}+\Delta.\]</span></p>
+<h2 id="高斯界的-gamma-怎么来">高斯界的 <span
+class="math inline">\(\gamma\)</span> 怎么来</h2>
+<p>标准正态分布的双尾概率为 <span
+class="math display">\[P(|Z|&gt;\gamma)=\mathrm{erfc}\!\left(\frac{\gamma}{\sqrt{2}}\right).\]</span>
+要求它等于 <span class="math inline">\(\varepsilon\)</span>： <span
+class="math display">\[\mathrm{erfc}\!\left(\frac{\gamma}{\sqrt{2}}\right)=\varepsilon
+\;\Longrightarrow\;
+\frac{\gamma}{\sqrt{2}}=\mathrm{erfc}^{-1}(\varepsilon)
+\;\Longrightarrow\;
+\gamma=\sqrt{2}\,\mathrm{erfc}^{-1}(\varepsilon).\]</span> <span
+class="math inline">\(\varepsilon=10^{-7}\)</span> 时 <span
+class="math inline">\(\gamma\approx5.327\)</span>：要留 5.33
+个标准差，才敢以 <span class="math inline">\(1-10^{-7}\)</span>
+的把握说真值在区间内。</p>
+<h2 id="切尔诺夫界为什么上下不对称">切尔诺夫界为什么上下不对称</h2>
+<p>对计数 <span class="math inline">\(x\)</span>，下尾大致满足 <span
+class="math display">\[P(X\le x-\Delta)\lesssim
+e^{-\Delta^2/(2x)}.\]</span> 代码里： <span
+class="math display">\[\Delta=\sqrt{2x\ln(16/\varepsilon^4)}
+\quad\Longleftrightarrow\quad
+e^{-\Delta^2/(2x)}=\frac{\varepsilon^4}{16},\]</span> <span
+class="math display">\[\widehat{\Delta}=\sqrt{2x\ln(\varepsilon^{-1.5})}
+\quad\Longleftrightarrow\quad
+e^{-\widehat{\Delta}^2/(2x)}=\varepsilon^{1.5}.\]</span> <span
+class="math inline">\(\varepsilon=10^{-7}\)</span> 时，<span
+class="math inline">\(\varepsilon^4/16\approx6.25\times10^{-29}\)</span>
+极小， 所以 <span class="math inline">\(\Delta\)</span> 很宽；<span
+class="math inline">\(\varepsilon^{1.5}\approx3.16\times10^{-11}\)</span>
+相对大， 所以 <span class="math inline">\(\widehat{\Delta}\)</span>
+较紧。下界更宽是刻意的：估 <span class="math inline">\(Y_1\)</span> 要用
+<span class="math inline">\(Q_v\)</span> 的下界， 宽一点更安全。</p>
+<blockquote>
+<p><strong>注意：</strong> <code>fluct.m</code> 里
+<code>hoeffBoundY0</code> 的形状是 <span
+class="math inline">\(\Delta Y_0=k\sqrt{Y_0}/N_0\)</span>，而
+<code>D.Q</code>/<code>D.T</code> 的霍夫丁形式是
+<span
+class="math inline">\(\Delta=k\sqrt{n_W}/N\)</span>。若把真空态的期望响应数理解为
+<span class="math inline">\(n_W=Y_0N_0\)</span>， 类比会得到 <span
+class="math inline">\(k\sqrt{Y_0/N_0}\)</span>。当前代码写的是 <span
+class="math inline">\(k\sqrt{Y_0}/N_0\)</span>。 如果要逐字对照指导书
+(3.35)，建议确认这一处的原始定义。这不影响
+“样本越多、区间越窄”的定性理解。</p>
+</blockquote>
+<h1 id="第-4-层估计层-codeestimate.mcode">第 4 层：估计层
+<code>estimate.m</code></h1>
+<h2 id="为什么不能直接算-y_1e_1">为什么不能直接算 <span
+class="math inline">\(Y_1,e_1\)</span></h2>
+<p>只有单光子脉冲真正安全：多光子脉冲可能被 PNS 攻击。但 Bob
+收到响应时，
+不知道刚才那个脉冲里有几个光子；能测到的只有“某个强度的总响应率 <span
+class="math inline">\(Q\)</span>”和 “总误码率 <span
+class="math inline">\(E\)</span>”。</p>
+<p>诱骗态方法写出两个方程： <span class="math display">\[\begin{aligned}
+Q_u&amp;=P_0^uY_0+P_1^uY_1+P_2^uY_2+\cdots,\\
+Q_v&amp;=P_0^vY_0+P_1^vY_1+P_2^vY_2+\cdots.
+\end{aligned}\]</span> 利用 <span class="math inline">\(u&gt;v\)</span>
+把 <span class="math inline">\(Y_2\)</span> 消掉，得到 <span
+class="math inline">\(Y_1\)</span> 的下界；同理用误码计数得到 <span
+class="math inline">\(e_1\)</span> 的上界。</p>
+<h2 id="第一步算脉冲数">第一步：算脉冲数</h2>
+<pre><code>wZ_u = p.Pza_u;       wX_u = 1 - p.Pza_u;
+wZ_v = p.Pza_v;       wX_v = 1 - p.Pza_v;
+
+NuZ = p.Pu * wZ_u * N;
+NvZ = p.Pv * wZ_v * N;
+NuX = p.Pu * wX_u * N;
+NvX = p.Pv * wX_v * N;
+N0  = p.P0 * N;</code></pre>
+<p>三层过滤： <span class="math display">\[\text{总脉冲数
+}N\;\times\;\text{选强度的概率}\;\times\;\text{选基的概率}
+=\text{这个格子的脉冲数}.\]</span> 默认 <span
+class="math inline">\(N=10^9\)</span> 时：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: right;">计算</th>
+<th style="text-align: right;">结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(N_{uZ}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.6\times0.5\times10^9\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.0\times10^8\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(N_{vZ}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.3\times0.5\times10^9\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.5\times10^8\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(N_{uX}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.6\times0.5\times10^9\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.0\times10^8\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(N_{vX}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.3\times0.5\times10^9\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.5\times10^8\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(N_0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.1\times10^9\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.0\times10^8\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>真空态不选基，所以只有一个 <span
+class="math inline">\(N_0\)</span>。</p>
+<h2 id="第二步真空态响应率的上下界">第二步：真空态响应率的上下界</h2>
+<pre><code>[Y0_lo, Y0_hi] = D.Y0(p.Y0, N0);</code></pre>
+<p>真空态脉冲里没有光子，Bob
+却响应，那只能是暗计数。它是最干净的噪声测量，
+所以用它校准后面所有估计。</p>
+<h2 id="第三步z-基增益的上下界">第三步：<span
+class="math inline">\(Z\)</span> 基增益的上下界</h2>
+<pre><code>nWz = NuZ .* g.Qu + NvZ .* g.Qv;
+[QuZ_lo, QuZ_hi] = D.Q(g.Qu, NuZ, nWz);
+[QvZ_lo, QvZ_hi] = D.Q(g.Qv, NvZ, nWz);</code></pre>
+<p><span class="math inline">\(n_{Wz}\)</span> 是 <span
+class="math inline">\(Z\)</span> 基里两种强度一共收到的期望事件数。</p>
+<h2 id="第四步x-基同样处理">第四步：<span
+class="math inline">\(X\)</span> 基同样处理</h2>
+<pre><code>nWx = NuX .* g.Qu + NvX .* g.Qv;
+[QuX_lo, QuX_hi] = D.Q(g.Qu, NuX, nWx);
+[QvX_lo, QvX_hi] = D.Q(g.Qv, NvX, nWx);
+[~, TvX_hi]      = D.T(g.Tv, NvX, nWx);</code></pre>
+<p><span class="math inline">\(X\)</span> 基用来估误码。<span
+class="math inline">\(T_v\)</span> 只需要上界，所以用
+<code> </code> 丢掉下界。</p>
+<h2 id="第五步泊松项">第五步：泊松项</h2>
+<pre><code>np = @(n, l) exp(-l) .* l.^n ./ factorial(n);
+
+P1u = np(1, p.u);  P2u = np(2, p.u);  P0u = np(0, p.u);
+P1v = np(1, p.v);  P2v = np(2, p.v);  P0v = np(0, p.v);</code></pre>
+<p><span class="math display">\[P_n^l=e^{-l}\frac{l^n}{n!}.\]</span></p>
+<p><span class="math inline">\(u=0.5\)</span>、<span
+class="math inline">\(v=0.1\)</span> 时：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">项</th>
+<th style="text-align: right;"><span
+class="math inline">\(u=0.5\)</span></th>
+<th style="text-align: right;"><span
+class="math inline">\(v=0.1\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(6.065307\times10^{-1}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(9.048374\times10^{-1}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_1\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.032653\times10^{-1}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(9.048374\times10^{-2}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_2\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(7.581633\times10^{-2}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.524187\times10^{-3}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="公式-3.28单光子响应率下界">公式 (3.28)：单光子响应率下界</h2>
+<p>分母：</p>
+<pre><code>den = P1v .* P2u - P1u .* P2v;</code></pre>
+<p><span class="math display">\[P_1^vP_2^u-P_1^uP_2^v
+=e^{-(u+v)}\frac{uv(u-v)}{2}.\]</span> 只要 <span
+class="math inline">\(u&gt;v\)</span>，分母恒正。这就是“诱骗态必须比信号态弱”的数学原因。</p>
+<p>公式： <span class="math display">\[Y_1^{Z,L}=
+\frac{
+P_2^uQ_v^L-P_2^vQ_u^U+
+\left(P_2^vP_0^u-P_2^uP_0^v\right)Y_0^U
+}{
+P_1^vP_2^u-P_1^uP_2^v
+}.\]</span></p>
+<p>代码：</p>
+<pre><code>Y1Lz = (P2u .* QvZ_lo - P2v .* QuZ_hi + ...
+        (P2v .* P0u - P2u .* P0v) .* Y0_hi) ./ den;
+Y1Lz = max(Y1Lz, 0);</code></pre>
+<p>为什么这样取上下界：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: left;">取哪一侧</th>
+<th style="text-align: left;">效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_v\)</span></td>
+<td style="text-align: left;">下界 <span
+class="math inline">\(Q_v^L\)</span></td>
+<td style="text-align: left;">分子变小 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(Y_1\)</span> 变小</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u\)</span></td>
+<td style="text-align: left;">上界 <span
+class="math inline">\(Q_u^U\)</span></td>
+<td style="text-align: left;">被减项变大 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(Y_1\)</span> 变小</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0\)</span></td>
+<td style="text-align: left;">上界 <span
+class="math inline">\(Y_0^U\)</span></td>
+<td style="text-align: left;">系数在 <span
+class="math inline">\(u&gt;v\)</span> 时为负 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(Y_1\)</span> 变小</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>每一步都朝“让 <span class="math inline">\(Y_1\)</span>
+更小”的方向取——宁少勿多。</p>
+<h2 id="公式推导思路">公式推导思路</h2>
+<p>写出两个强度的增益： <span class="math display">\[\begin{aligned}
+Q_u&amp;=P_0^uY_0+P_1^uY_1+P_2^uY_2+H_u,\\
+Q_v&amp;=P_0^vY_0+P_1^vY_1+P_2^vY_2+H_v,
+\end{aligned}\]</span> 其中 <span class="math inline">\(H\)</span>
+是三光子及以上的贡献。为了消掉 <span
+class="math inline">\(Y_2\)</span>，计算 <span
+class="math display">\[P_2^vQ_u-P_2^uQ_v.\]</span> 整理后 <span
+class="math inline">\(Y_2\)</span> 项抵消： <span
+class="math display">\[\begin{aligned}
+\left(P_1^vP_2^u-P_1^uP_2^v\right)Y_1
+={}&amp;P_2^uQ_v-P_2^vQ_u
++\left(P_2^vP_0^u-P_2^uP_0^v\right)Y_0 \\
+&amp;-\left(P_2^uH_v-P_2^vH_u\right).
+\end{aligned}\]</span> 对 <span
+class="math inline">\(u&gt;v\)</span>、<span
+class="math inline">\(n\ge3\)</span>，可以证明 <span
+class="math inline">\(P_2^uP_n^v-P_2^vP_n^u&lt;0\)</span>，所以 <span
+class="math inline">\(P_2^uH_v-P_2^vH_u\le0\)</span>。把它丢掉，右边只会更小，于是得到下界。</p>
+<h2 id="公式-3.29单光子误码率上界">公式 (3.29)：单光子误码率上界</h2>
+<p>误码计数： <span class="math display">\[T_l=E_lQ_l
+=P_0^le_0Y_0+P_1^le_1Y_1+\sum_{n\ge2}P_n^le_nY_n.\]</span>
+丢掉非负的高阶项： <span class="math display">\[T_v\ge
+P_0^ve_0Y_0+P_1^ve_1Y_1.\]</span> 移项： <span
+class="math display">\[e_1\le
+\frac{T_v-P_0^ve_0Y_0}{P_1^vY_1}.\]</span></p>
+<p>代码：</p>
+<pre><code>e1Ux = (TvX_hi - P0v .* p.e0 .* Y0_lo) ./ ...
+       (P1v .* max(Y1Lx, realmin));
+e1Ux = min(max(e1Ux, 0), 0.5);</code></pre>
+<p>保守方向：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: left;">取哪一侧</th>
+<th style="text-align: left;">效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(T_v\)</span></td>
+<td style="text-align: left;">上界 <span
+class="math inline">\(T_v^U\)</span></td>
+<td style="text-align: left;">分子变大 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(e_1\)</span> 变大</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0\)</span></td>
+<td style="text-align: left;">下界 <span
+class="math inline">\(Y_0^L\)</span></td>
+<td style="text-align: left;">扣得少 <span
+class="math inline">\(\to\)</span> 分子更大 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(e_1\)</span> 变大</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1\)</span></td>
+<td style="text-align: left;">下界 <span
+class="math inline">\(Y_1^L\)</span></td>
+<td style="text-align: left;">分母变小 <span
+class="math inline">\(\to\)</span> <span
+class="math inline">\(e_1\)</span> 变大</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code>max(Y1Lx, realmin)</code> 防止除以
+0；<code>min(max(..., 0), 0.5)</code> 把误码率限制在 <span
+class="math inline">\([0,0.5]\)</span>。</p>
+<h2 id="估不出来时直接认输">估不出来时直接认输</h2>
+<pre><code>e1Ux(Y1Lx &lt;= 0) = 0.5;</code></pre>
+<p>如果连单光子响应率都估不出来，就按最坏情况处理：单光子误码等同于瞎猜。
+此时 <span
+class="math inline">\(H_2(0.5)=1\)</span>，隐私放大扣掉全部比特，密钥率被压到
+0。</p>
+<h2 id="km-数值例子-1">100 km 数值例子</h2>
+<p><span class="math inline">\(N=10^9\)</span>、<span
+class="math inline">\(\varepsilon=10^{-7}\)</span>、高斯界：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: right;">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(Y_0^L\)</span>
+/ <span class="math inline">\(Y_0^U\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.2466\times10^{-6}\)</span> / <span
+class="math inline">\(2.7534\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u^{Z,L}\)</span> / <span
+class="math inline">\(Q_u^{Z,U}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.4835\times10^{-3}\)</span> / <span
+class="math inline">\(2.5143\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q_v^{Z,L}\)</span> / <span
+class="math inline">\(Q_v^{Z,U}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.9213\times10^{-4}\)</span> / <span
+class="math inline">\(5.1162\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(T_v^{X,U}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(9.7661\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(\mathrm{den}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(5.4881\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{Z,L}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.6925\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{X,L}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.6925\times10^{-3}\)</span>（两基对称）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(e_1^{X,U}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.1673\times10^{-2}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="第-5-层密钥率层-codekeyrateat.mcode">第 5 层：密钥率层
+<code>keyRateAt.m</code></h1>
+<h2 id="信号态单光子概率">信号态单光子概率</h2>
+<pre><code>d.P1u = exp(-p.u) .* p.u;</code></pre>
+<p><span class="math display">\[P_1^u=e^{-u}u.\]</span> <span
+class="math inline">\(u=0.5\)</span> 时 <span
+class="math inline">\(P_1^u=3.032653\times10^{-1}\)</span>。</p>
+<h2 id="二进制熵">二进制熵</h2>
+<pre><code>H2 = @(x) -(x .* log2(max(x, realmin)) + ...
+            (1 - x) .* log2(max(1 - x, realmin)));</code></pre>
+<p><span class="math display">\[H_2(x)=-x\log_2
+x-(1-x)\log_2(1-x).\]</span></p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><span
+class="math inline">\(x\)</span></th>
+<th style="text-align: right;"><span
+class="math inline">\(H_2(x)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;">0.5</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td style="text-align: left;">0.015</td>
+<td style="text-align: right;"><span
+class="math inline">\(\approx0.115\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code>max(., realmin)</code> 防止 <span
+class="math inline">\(\log_2 0=-\infty\)</span> 污染结果。</p>
+<h2 id="收入与支出">收入与支出</h2>
+<p><span class="math display">\[\begin{aligned}
+\text{收入}&amp;=P_1^u\,Y_1^{Z,L}\left(1-H_2(e_1^{X,U})\right),\\
+\text{支出}&amp;=Q_u\,f\,H_2(E_u).
+\end{aligned}\]</span></p>
+<p>收入：单光子脉冲里，扣掉 Eve 可能知道的信息后，还能留下的比特；
+支出：纠错必须公开的比特数。</p>
+<p>资格系数： <span class="math display">\[P_uP_{Z\mid
+u}^{A}P_Z^{B}=0.6\times0.5\times0.5=0.15.\]</span> 只有“信号态 <span
+class="math inline">\(+\)</span> Alice 选 <span
+class="math inline">\(Z\)</span> <span class="math inline">\(+\)</span>
+Bob 选 <span class="math inline">\(Z\)</span>”的脉冲才参与成码。</p>
+<h2 id="截断">截断</h2>
+<pre><code>R(~isfinite(R)) = 0;
+R(R &lt; 0) = 0;</code></pre>
+<p>NaN/Inf
+表示估计失效或参数越界，按“无密钥”处理；负数表示收入不够付支出，
+物理上意味着通信应停止。截成 0 而不是删除，是为了让 <span
+class="math inline">\(R\)</span> 和 <span
+class="math inline">\(L\)</span> 保持一一对应。</p>
+<h2 id="km-结果">100 km 结果</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">量</th>
+<th style="text-align: right;">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^u\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.032653\times10^{-1}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(H_2(e_1^{X,U})\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.5074\times10^{-1}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(H_2(E_u)\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.1470\times10^{-1}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">收入 <span
+class="math inline">\(P_1^uY_1^{Z,L}(1-H_2(e_1^{X,U}))\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.2086\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">支出 <span
+class="math inline">\(Q_ufH_2(E_u)\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.3243\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">差值</td>
+<td style="text-align: right;"><span
+class="math inline">\(8.762\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">资格系数</td>
+<td style="text-align: right;"><span
+class="math inline">\(0.15\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><span
+class="math inline">\(\mathbf{R}\)</span></strong></td>
+<td style="text-align: right;"><span
+class="math inline">\(\mathbf{1.3143\times10^{-4}}\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>这个值与 <code>checks/runTests.m</code> 里高斯金标准
+<span class="math inline">\(R(100)=1.314340882149\times10^{-4}\)</span>
+一致（手算四舍五入）。</p>
+<h1
+id="调度层coderuncase.mcode-与-codetaskscode">调度层：<code>runCase.m</code>
+与 <code>tasks/</code></h1>
+<p><code>keyRateAt</code>
+只算一个距离点。要画曲线，还需要外层循环。</p>
+<h2 id="coderuncasecode-做的事"><code>runCase</code>
+做的事</h2>
+<pre><code>L = spec.L(1) : spec.L(3) : spec.L(2);
+for i = 1:n
+    out.R(i) = rateFor(p, L(i), spec, p.u, p.v, p.Pu, p.Pv);
+end</code></pre>
+<p>三种模式：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><code>spec.opt</code></th>
+<th style="text-align: left;">行为</th>
+<th style="text-align: left;">任务</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>none</code></td>
+<td style="text-align: left;">参数固定，只扫距离</td>
+<td style="text-align: left;">任务 1</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>u</code></td>
+<td style="text-align: left;">每个距离选最优 <span
+class="math inline">\(u\)</span>（601 个候选）</td>
+<td style="text-align: left;">任务 2</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>global</code></td>
+<td style="text-align: left;">差分进化联合优化 <span
+class="math inline">\((u,v,P_u,P_v)\)</span></td>
+<td style="text-align: left;">任务 3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2
+id="coderateforcode把参数写回表"><code>rateFor</code>：把参数写回表</h2>
+<pre><code>function R = rateFor(p, L, spec, u, v, Pu, Pv)
+q = p;
+q.u = u;  q.v = v;
+q.Pu = Pu; q.Pv = Pv;
+q.P0 = 1 - Pu - Pv;
+R = qkd.keyRateAt(q, L, spec);
+end</code></pre>
+<p>优化的本质就是：改参数 <span class="math inline">\(\to\)</span> 重算
+<span class="math inline">\(\to\)</span> 比较 <span
+class="math inline">\(\to\)</span> 再改。</p>
+<h2 id="最远成码距离">最远成码距离</h2>
+<pre><code>idx = find(out.R &gt; 0, 1, &#39;last&#39;);
+out.Lmax = out.L(idx);</code></pre>
+<p>最后一个还有正密钥的距离，就是“最远成码距离”。</p>
+<h2 id="任务脚本只负责三件事">任务脚本只负责三件事</h2>
+<ol>
+<li><p>收集参数（<code>p</code> <span
+class="math inline">\(+\)</span>
+<code>spec</code>）；</p></li>
+<li><p>调 <code>qkd.runCase</code>；</p></li>
+<li><p>画图 <span class="math inline">\(+\)</span>
+<code>saveResult</code>。</p></li>
+</ol>
+<p>任务脚本里没有任何物理公式。</p>
+<h1 id="任务-2一维网格搜索只优化信号态光强-u">任务
+2：一维网格搜索（只优化信号态光强 <span
+class="math inline">\(u\)</span>）</h1>
+<h2 id="任务目标与调用链">任务目标与调用链</h2>
+<p>任务 2 在 <span class="math inline">\(N=10^9\)</span>
+下比较高斯、霍夫丁、切尔诺夫三种统计界，并对每个距离点
+单独选择最优信号态光强 <span
+class="math inline">\(u\)</span>。它输出两张图：</p>
+<ul>
+<li><p><code>fig2_three_methods</code>：三种方法的 <span
+class="math inline">\(R\)</span>–<span class="math inline">\(L\)</span>
+曲线；</p></li>
+<li><p><code>fig2b_optimal_u</code>：最优 <span
+class="math inline">\(u^*(L)\)</span> 随距离的变化。</p></li>
+</ul>
+<p>调用链：</p>
+<pre><code>run_task2
+  -&gt; qkd.runCase(p, spec)              % spec.opt = &#39;u&#39;
+       -&gt; rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv)
+            -&gt; qkd.keyRateAt(q, L(i), spec)
+                 -&gt; qkd.estimate(q, L(i), spec)</code></pre>
+<h2 id="优化模型">优化模型</h2>
+<p>对每个固定距离 <span
+class="math inline">\(L\)</span>，只优化一个变量： <span
+class="math display">\[u^*(L)=\operatorname*{arg\,max}_{u\in\mathcal{U}}
+R(L;u,v,P_u,P_v),\]</span> 其中 <span
+class="math display">\[\mathcal{U}=\{0.10+j\Delta u\}_{j=0}^{600},\qquad
+\Delta u=\frac{1.30-0.10}{600}=0.002.\]</span> <span
+class="math inline">\(v,P_u,P_v\)</span> 保持题目给定值不变，只有 <span
+class="math inline">\(u\)</span> 在 <span
+class="math inline">\([0.10,1.30]\)</span> 上搜索。</p>
+<p>为什么用网格而不是梯度法：</p>
+<ul>
+<li><p>只有一维，601 个点完全可以穷举；</p></li>
+<li><p><span class="math inline">\(R(u)\)</span>
+经过诱骗态估计和统计界，解析导数很难写；</p></li>
+<li><p>网格搜索是确定性的，不引入随机性，容易复现和解释。</p></li>
+</ul>
+<h2 id="代码实现">代码实现</h2>
+<p>任务脚本中的 <code>spec</code>：</p>
+<pre><code>spec = struct(&#39;method&#39;, meth{k}, &#39;N&#39;, 1e9, &#39;eps&#39;, 1e-7, ...
+              &#39;L&#39;, [0 300 1], &#39;opt&#39;, &#39;u&#39;, ...
+              &#39;optU&#39;, struct(&#39;lb&#39;, 0.10, &#39;ub&#39;, 1.30, ...
+                             &#39;n&#39;, 601, &#39;mode&#39;, &#39;perDistance&#39;));</code></pre>
+<p><code>runCase</code> 的 <code>u</code>
+模式分支：</p>
+<pre><code>ug = linspace(spec.optU.lb, spec.optU.ub, spec.optU.n);
+
+for i = 1:n
+    Rv = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
+    [rmax, k] = max(Rv);
+    out.R(i) = rmax;
+    out.u(i) = ug(k);
+end</code></pre>
+<p>关键点：<code>rateFor</code> 的第四个参数是向量
+<code>ug</code>，不是标量。
+<code>keyRateAt</code> 以及它调用的
+<code>gain</code>、<code>estimate</code>
+全部使用逐元素运算， 所以一次调用就能算出 601 个候选的 <span
+class="math inline">\(R\)</span>，返回长度 601 的向量
+<code>Rv</code>。 然后 <code>max</code>
+找出最大值与下标，把对应的 <span class="math inline">\(u\)</span> 记进
+<code>out.u(i)</code>。</p>
+<p>这样距离循环只执行 301 次，而不是 <span
+class="math inline">\(301\times601\)</span> 次； 601
+个候选的评估被压在每次向量化调用里。</p>
+<h2 id="另一种模式整段统一-u">另一种模式：整段统一 <span
+class="math inline">\(u\)</span></h2>
+<p><code>runCase</code> 还支持 <code>mode</code>
+设为 <code>fixed</code>：整条曲线用一个 <span
+class="math inline">\(u\)</span>。 实现是先把所有候选算成矩阵：</p>
+<pre><code>Rm = zeros(numel(ug), n);
+for i = 1:n
+    Rm(:, i) = rateFor(p, L(i), spec, ug, p.v, p.Pu, p.Pv);
+end
+[~, uIdx] = max(sum(Rm &gt; 0, 2));
+out.R = Rm(uIdx, :);
+out.u = ug(uIdx) * ones(1, n);</code></pre>
+<p>对矩阵 <code>Rm</code>
+的每一行，统计该候选能让多少个距离点保持正密钥 （即该行大于 0
+的元素个数），取最大的那个，即“传得最远”的 <span
+class="math inline">\(u\)</span>。 任务 2 用的是
+<code>perDistance</code>，不是这个模式，但理解它有助于回答
+“实际系统能不能按距离换 <span class="math inline">\(u\)</span>”。</p>
+<h2 id="复杂度精度与一个注释不一致">复杂度、精度与一个注释不一致</h2>
+<p>任务 2 的候选评估量： <span class="math display">\[3\text{
+种方法}\times301\text{ 个距离}\times601\text{ 个候选}
+=543{,}903\text{ 次单点 }R\text{ 评估}.\]</span> 由于每次
+<code>rateFor</code> 一次算 601 个候选，实际只发生 <span
+class="math inline">\(3\times301=903\)</span> 次向量化调用。</p>
+<p>网格分辨率 <span class="math inline">\(\Delta
+u=0.002\)</span>。<code>argmax</code> 给出的 <span
+class="math inline">\(u^*\)</span> 与真实连续最优最多差半个网格； 由于
+<span class="math inline">\(R(u)\)</span>
+在最优附近通常较平，密钥率的误差远小于 <span
+class="math inline">\(0.002\)</span> 本身。</p>
+<blockquote>
+<p><strong>注意：</strong> 当前 <code>run_task2.m</code>
+里写的是 <code>n = 601</code>，但同一行的注释仍写“61
+个候选”。 以代码为准。工程文档里任务 2 的实测数字是按 <code>n =
+61</code> 记录的； 如果重新用 601 跑，<span
+class="math inline">\(L_{\max}\)</span> 和 <span
+class="math inline">\(u^*(L)\)</span> 可能有轻微变化。</p>
+</blockquote>
+<h2 id="物理读图ul-为什么随距离下降">物理读图：<span
+class="math inline">\(u^*(L)\)</span> 为什么随距离下降</h2>
+<p>近距离时，光纤损耗小，可以适当提高 <span
+class="math inline">\(u\)</span> 来增加响应率；
+远距离时，单光子到达率已经很低，如果 <span
+class="math inline">\(u\)</span> 太大，多光子比例上升， 诱骗态估计给出的
+<span class="math inline">\(Y_1^{Z,L}\)</span>
+下界会被压得更低，反而得不偿失。 所以最优 <span
+class="math inline">\(u\)</span> 通常随距离单调下降——这也是
+<code>fig2b_optimal_u</code> 想回答的问题。</p>
+<p>工程文档中的一组实测值（<code>n = 61</code> 时）： 高斯
+<span class="math inline">\(L_{\max}=176\)</span> km，霍夫丁 <span
+class="math inline">\(157\)</span> km，切尔诺夫 <span
+class="math inline">\(164\)</span> km。 当前
+<code>run_task2.m</code> 改为 <code>n =
+601</code> 后，数值可能略有变化。</p>
+<h1 id="任务-3四维全局优化差分进化-坐标下降">任务
+3：四维全局优化（差分进化 + 坐标下降）</h1>
+<h2 id="任务目标">任务目标</h2>
+<p>任务 3 在切尔诺夫界、<span class="math inline">\(N=10^9\)</span>
+下，同时优化四个参数： <span class="math display">\[(u,\ v,\ P_u,\
+P_v).\]</span> 先跑一条 <code>opt</code> 为
+<code>none</code> 的基准曲线，再跑
+<code>opt</code> 为 <code>global</code>
+的优化曲线， 比较最远成码距离和同距离下的速率增益。</p>
+<h2 id="为什么不能继续网格搜索">为什么不能继续网格搜索</h2>
+<p>任务 2 的一维网格只有 601 个点；如果四个维度各取 30 个点，组合数是
+<span class="math display">\[30^4=810{,}000,\]</span>
+而且每个候选都要跑完整的
+<code>gain</code>、<code>fluct</code>、<code>estimate</code>、
+<code>keyRateAt</code>
+链。目标函数还非凸、带约束、没有解析梯度。所以任务 3
+不再穷举，而是用<strong>差分进化</strong>（Differential Evolution,
+DE）做全局搜索， 再用<strong>坐标下降</strong>做局部打磨。</p>
+<h2 id="优化变量边界与约束">优化变量、边界与约束</h2>
+<p>代码把四个变量写成 <span class="math display">\[x=(u,\ v/u,\ P_u,\
+P_v),\]</span> 第二维用比值 <span class="math inline">\(v/u\)</span>
+而不是 <span class="math inline">\(v\)</span>
+本身。这样做有两个好处：</p>
+<ul>
+<li><p>只要 <span class="math inline">\(v/u&lt;1\)</span>，就自动保证
+<span class="math inline">\(v&lt;u\)</span>，不会出现 (3.28)
+分母变号；</p></li>
+<li><p><span class="math inline">\(u\)</span> 和 <span
+class="math inline">\(v\)</span>
+同比例缩放时比值不变，搜索空间更“正”。</p></li>
+</ul>
+<p>边界：</p>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">变量</th>
+<th style="text-align: right;">下界</th>
+<th style="text-align: right;">上界</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(u\)</span></td>
+<td style="text-align: right;">0.10</td>
+<td style="text-align: right;">1.40</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(v/u\)</span></td>
+<td style="text-align: right;">0.02</td>
+<td style="text-align: right;">0.90</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_u\)</span></td>
+<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">0.90</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(P_v\)</span></td>
+<td style="text-align: right;">0.02</td>
+<td style="text-align: right;">0.90</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>目标函数就是完整链算出的密钥率： <span
+class="math display">\[f(x)=R(L;u,v,P_u,P_v),\]</span> 但
+<code>objFun</code> 会把不合法的候选直接判 0： <span
+class="math display">\[\begin{aligned}
+v&amp;\ge u &amp;&amp;\Rightarrow f=0,\\
+P_u+P_v&amp;&gt;0.95 &amp;&amp;\Rightarrow f=0,\\
+P_u&amp;\le0\ \text{或}\ P_v\le0 &amp;&amp;\Rightarrow f=0.
+\end{aligned}\]</span> <span
+class="math inline">\(P_u+P_v\le0.95\)</span> 是为了给真空态至少留 <span
+class="math inline">\(5\%\)</span> 的样本； 否则 <span
+class="math inline">\(Y_0\)</span>
+估不准，整个诱骗态估计会失效。计算中出现的 NaN/Inf 也一律记 0。</p>
+<h2 id="外层5-km-粗网格">外层：5 km 粗网格</h2>
+<p>全局优化的单点代价约为普通扫描的几百倍，所以不在 301 个 1 km
+点上逐个优化， 而是先每隔 5 km 优化一次：</p>
+<pre><code>stepIdx = max(1, round(gopt.strideL / spec.L(3)));
+idxC    = unique([1:stepIdx:n, n]);
+nc      = numel(idxC);</code></pre>
+<p>取 <code>strideL = 5</code>、<code>spec.L = [0 300
+1]</code> 时： <span
+class="math display">\[\text{idxC}=[1,6,11,\ldots,296,301],\qquad
+nc=61.\]</span></p>
+<p>为什么可以这样：相邻距离点的最优参数几乎连成一条平滑曲线， 每 5 km
+优化一次足够；插值带来的保守性远小于“少算一半距离”的误差。</p>
+<h2 id="内层差分进化">内层：差分进化</h2>
+<p>每一代种群有 <code>npop</code>
+个个体，每个个体是一个四维候选。任务 3 用
+<code>npop=30</code>、<code>ngen=40</code>；<code>runCase</code>
+的默认值是 40 和 60。</p>
+<p>伪代码：</p>
+<pre><code>pop = lb + rand(npop, Dm) .* (ub - lb);
+fit = objFun(p, L, spec, pop);
+
+for g = 1:ngen
+    for i = 1:npop
+        pick three random indices r1, r2, r3
+        mutant(i,:) = pop(r1,:) + F*(pop(r2,:) - pop(r3,:));
+        mutant(i,:) = clamp(mutant(i,:), lb, ub);
+    end
+    crossover ...
+    trial = pop;  trial(cross) = mutant(cross);
+    ft = objFun(p, L, spec, trial);
+    where ft &gt; fit:  pop = trial;  fit = ft;
+end
+xb = best individual;</code></pre>
+<p>三个核心公式。</p>
+<p><strong>变异（mutation）：</strong> <span
+class="math display">\[m_i=x_{r_1}+F\,(x_{r_2}-x_{r_3}),\qquad
+F=0.6.\]</span> 拿两个个体的差去推第三个个体；<span
+class="math inline">\(F\)</span> 是步长。</p>
+<p><strong>交叉（crossover）：</strong> <span
+class="math display">\[t_{i,d}=
+\begin{cases}
+m_{i,d}, &amp; U_{i,d}\le CR\ \text{或}\ d=d_{\text{rand}},\\
+x_{i,d}, &amp; \text{otherwise},
+\end{cases}
+\qquad CR=0.7.\]</span> 每个维度以 <span
+class="math inline">\(70\%\)</span> 的概率采用变异结果；<span
+class="math inline">\(d_{\text{rand}}\)</span> 保证至少有一维来自变异，
+否则试验个体可能和父代完全一样，进化白做。</p>
+<p><strong>选择（selection）：</strong> <span
+class="math display">\[x_i\leftarrow
+\begin{cases}
+t_i, &amp; f(t_i)&gt;f(x_i),\\
+x_i, &amp; \text{otherwise}.
+\end{cases}\]</span> 只留更好的，这就是“进化”。</p>
+<p><code>objFun</code> 支持矩阵输入：一次传入
+<code>npop</code><span
+class="math inline">\(\times4\)</span> 的候选矩阵， 返回
+<code>npop</code><span
+class="math inline">\(\times1\)</span> 的得分向量。因为
+<code>keyRateAt</code> 是逐元素运算，
+一整代可以在一次调用里评估完。</p>
+<h2 id="可复现性与两个实现细节">可复现性与两个实现细节</h2>
+<p><code>optimizeGlobal</code> 开头有</p>
+<pre><code>rng(20260101);</code></pre>
+<p>固定随机种子，保证每次运行得到完全一样的结果。</p>
+<ul>
+<li><p>这个 <code>rng</code>
+在每个粗距离点都会调用一次，所以每个点都从同一条随机序列开始。
+好处是完全可复现；代价是各点的随机流不是独立的。若想要独立重复，可以把
+<code>rng</code> 移到外层，或按距离设置不同种子。</p></li>
+<li><p>抽取参照个体用的是
+<code>randperm(npop,3)</code>，它没有排除当前个体 <span
+class="math inline">\(i\)</span>。 标准 DE 通常要求 <span
+class="math inline">\(r_1,r_2,r_3\)</span> 与 <span
+class="math inline">\(i\)</span> 不同；这里属于实现细节，
+对启发式搜索影响有限，但严格实现可以从“其余个体”中抽样。</p></li>
+</ul>
+<h2 id="局部打磨坐标下降">局部打磨：坐标下降</h2>
+<p>差分进化擅长“找到大致方向”，但不擅长“精确到小数点后三位”。所以在最优个体附近
+再做一次无导数局部搜索：</p>
+<pre><code>step = 0.05 * (ub - lb);
+for iter = 1:30
+    improved = false;
+    for d = 1:4
+        for s = [-1, 1]
+            cand = xb;
+            cand(d) = clamp(cand(d) + s*step(d), lb(d), ub(d));
+            fc = objFun(p, L, spec, cand);
+            if fc &gt; fb
+                xb = cand; fb = fc; improved = true;
+            end
+        end
+    end
+    if ~improved
+        step = step * 0.5;
+        if all(step &lt; 1e-4), break; end
+    end
+end</code></pre>
+<p>数学上就是逐维坐标搜索： <span
+class="math display">\[x^{(k+1)}=x^{(k)}+s_d\,\mathrm{step}_d\,\mathbf{e}_d,
+\qquad s_d\in\{-1,+1\},\]</span>
+有改进就接受；一整轮都没改进就把步长减半；四个维度的步长都小于 <span
+class="math inline">\(10^{-4}\)</span> 时停止。</p>
+<p>为什么用坐标下降而不是梯度法：目标函数经过约束裁剪、统计界和截断，
+既不光滑也没有可靠导数；坐标搜索只需要比较函数值，稳健且实现简单。</p>
+<h2 id="回到-1-km插值参数不插值曲线">回到 1
+km：插值参数，不插值曲线</h2>
+<p>粗网格只有 61 个点，最终要输出 301 个 1 km 点。代码的做法是：</p>
+<ol>
+<li><p>只保留“参数有限且 <span
+class="math inline">\(R&gt;0\)</span>”的粗点；</p></li>
+<li><p>把这些粗点的最优参数插值到所有 1 km 点： <span
+class="math display">\[x(L)=\mathrm{interp1}\!\left(L_{\text{coarse}},x^*_{\text{coarse}},L,
+\text{linear},\mathrm{NaN}\right);\]</span></p></li>
+<li><p>用插值出来的参数，在每个 1 km 点重新算一次完整的 <span
+class="math inline">\(R\)</span>。</p></li>
+</ol>
+<p>为什么插值参数而不是直接插值 <span
+class="math inline">\(R\)</span>：</p>
+<ul>
+<li><p><span class="math inline">\(R(L)\)</span>
+随距离指数下降，线性插值曲线会明显失真；</p></li>
+<li><p>最优参数 <span
+class="math inline">\(u^*(L),v^*(L),P_u^*(L),P_v^*(L)\)</span>
+变化平滑，适合插值；</p></li>
+<li><p>每个细点都用真实模型重算，结果是“真算出来的”，只是参数未必对该点最优，
+所以略偏保守（宁可低估）。</p></li>
+</ul>
+<p>范围外的插值返回 <code>NaN</code>，进入
+<code>keyRateAt</code> 后被截成 <span
+class="math inline">\(R=0\)</span>， 所以曲线不会出现 NaN。</p>
+<h2 id="断崖区细化">断崖区细化</h2>
+<p>粗网格每 5 km 才一个点，可能把最后不到 5 km 的成码区漏掉，让 <span
+class="math inline">\(L_{\max}\)</span> 少算几公里。
+所以代码在“最后一个有密钥的粗点”和“下一个粗点”之间，逐点重新优化：</p>
+<pre><code>kl = find(Rc &gt; 0, 1, &#39;last&#39;);
+if ~isempty(kl) &amp;&amp; kl &lt; nc
+    for i = idxC(kl)+1 : idxC(kl+1)-1
+        [xb, fb] = optimizeGlobal(p, L(i), spec, gopt);
+        out.u(i)  = xb(1);
+        out.v(i)  = xb(1) * xb(2);
+        out.Pu(i) = xb(3);
+        out.Pv(i) = xb(4);
+        out.R(i)  = fb;
+    end
+end</code></pre>
+<p>这一段最多只有 4 个点，但能把 <span
+class="math inline">\(L_{\max}\)</span> 补准。</p>
+<h2 id="收尾无密钥区的参数">收尾：无密钥区的参数</h2>
+<pre><code>dead = out.R &lt;= 0;
+out.u(dead) = NaN;  out.v(dead) = NaN;
+out.Pu(dead) = NaN; out.Pv(dead) = NaN;</code></pre>
+<p>没有密钥的区域不存在“最优参数”，置成 NaN
+后画图会自然断开，不会出现无意义的跳变。 <span
+class="math inline">\(L_{\max}\)</span> 仍然定义为最后一个 <span
+class="math inline">\(R&gt;0\)</span> 的距离。</p>
+<h2 id="复杂度与设计取舍">复杂度与设计取舍</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">项目</th>
+<th style="text-align: left;">任务 2</th>
+<th style="text-align: left;">任务 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">优化变量</td>
+<td style="text-align: left;"><span class="math inline">\(u\)</span>（1
+维）</td>
+<td style="text-align: left;"><span
+class="math inline">\((u,v,P_u,P_v)\)</span>（4 维）</td>
+</tr>
+<tr>
+<td style="text-align: left;">搜索方式</td>
+<td style="text-align: left;">网格穷举</td>
+<td style="text-align: left;">差分进化 + 坐标下降</td>
+</tr>
+<tr>
+<td style="text-align: left;">搜索规模</td>
+<td style="text-align: left;">601 个候选</td>
+<td style="text-align: left;"><code>npop=30</code>,
+<code>ngen=40</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">距离处理</td>
+<td style="text-align: left;">每个 1 km 独立</td>
+<td style="text-align: left;">5 km 粗网格 + 参数插值 + 断崖细化</td>
+</tr>
+<tr>
+<td style="text-align: left;">确定性</td>
+<td style="text-align: left;">完全确定</td>
+<td style="text-align: left;">固定种子，仍可复现</td>
+</tr>
+<tr>
+<td style="text-align: left;">最优性</td>
+<td style="text-align: left;">网格内全局最优</td>
+<td style="text-align: left;">启发式，不保证全局最优</td>
+</tr>
+<tr>
+<td style="text-align: left;">输出</td>
+<td style="text-align: left;"><span
+class="math inline">\(R(L),u^*(L)\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(R(L),u^*,v^*,P_u^*,P_v^*\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>粗略的候选评估量：</p>
+<ul>
+<li><p>任务 2：<span
+class="math inline">\(3\times301\times601\approx5.4\times10^5\)</span>
+次单点 <span class="math inline">\(R\)</span> 评估， 但每次向量化评估
+601 个候选；</p></li>
+<li><p>任务 3：每个粗点约 <span
+class="math inline">\(30\times40=1200\)</span> 次 DE 候选评估，再加最多
+<span class="math inline">\(30\times4\times2=240\)</span> 次局部搜索；61
+个粗点合计约 <span class="math inline">\(9\times10^4\)</span>
+次候选评估， 另加断崖细化。</p></li>
+</ul>
+<p>任务 3 的每次候选评估都要跑完整条估计链，所以它是整个工程最慢的部分；
+<code>run_task3.m</code> 的注释说全局优化约占任务 3
+运行时间的 <span class="math inline">\(96\%\)</span>。</p>
+<h2
+id="物理读图四个最优参数为什么随距离漂移">物理读图：四个最优参数为什么随距离漂移</h2>
+<ul>
+<li><p>近距离：可以适当提高 <span class="math inline">\(u\)</span>、降低
+<span class="math inline">\(v\)</span>，用更强的信号换响应率；</p></li>
+<li><p>远距离：单光子到达率低，必须提高 <span
+class="math inline">\(v\)</span> 与 <span
+class="math inline">\(P_v\)</span> 才能把单光子参数估准， 同时压低 <span
+class="math inline">\(u\)</span>，避免多光子比例过高；</p></li>
+<li><p><span class="math inline">\(P_u\)</span> 与真空态概率 <span
+class="math inline">\(P_0=1-P_u-P_v\)</span> 互相挤压：<span
+class="math inline">\(P_u\)</span> 太大，真空样本太少， <span
+class="math inline">\(Y_0\)</span>
+的统计误差变大，反而会拖累远端性能。</p></li>
+</ul>
+<p>工程文档中的一组实测值：切尔诺夫、<span
+class="math inline">\(N=10^9\)</span> 时，未优化 <span
+class="math inline">\(L_{\max}=164\)</span> km， 全局优化后 <span
+class="math inline">\(171\)</span> km；速率提升约 <span
+class="math inline">\(+49\%\)</span> @50 km、<span
+class="math inline">\(+30\%\)</span> @100 km、<span
+class="math inline">\(+14\%\)</span> @150 km。 这些数字随
+<code>npop/ngen</code>
+和统计界设置会变化，仅作量级参考。</p>
+<h1 id="完整链路与端到端数值示例">完整链路与端到端数值示例</h1>
+<h2 id="公式链">公式链</h2>
+<p><span class="math display">\[\begin{aligned}
+&amp;p.\alpha,\ p.\eta_d,\ L
+\;\Longrightarrow\;
+\eta=\eta_d10^{-\alpha L/10}\\
+&amp;\Longrightarrow\;
+\eta_u=1-e^{-\eta u},\quad \eta_v=1-e^{-\eta v}\\
+&amp;\Longrightarrow\;
+Q_u=Y_0+\eta_u,\quad Q_v=Y_0+\eta_v\\
+&amp;\Longrightarrow\;
+E_u,E_v\quad\Longrightarrow\quad T_u=E_uQ_u,\quad T_v=E_vQ_v\\
+&amp;\Longrightarrow\;
+D.Q,\ D.T,\ D.Y_0\ \text{给出上下界}\\
+&amp;\Longrightarrow\;
+P_1^u,P_2^u,P_0^u,P_1^v,P_2^v,P_0^v\\
+&amp;\Longrightarrow\;
+Y_1^{Z,L}=\frac{P_2^uQ_v^L-P_2^vQ_u^U+
+(P_2^vP_0^u-P_2^uP_0^v)Y_0^U}{P_1^vP_2^u-P_1^uP_2^v}\\
+&amp;\Longrightarrow\;
+e_1^{X,U}=\frac{T_v^U-P_0^ve_0Y_0^L}{P_1^vY_1^{X,L}}\\
+&amp;\Longrightarrow\;
+R=P_uP_{Z\mid u}^{A}P_Z^{B}
+\left[P_1^uY_1^{Z,L}\left(1-H_2(e_1^{X,U})\right)
+-Q_ufH_2(E_u)\right].
+\end{aligned}\]</span></p>
+<h2 id="函数调用栈">函数调用栈</h2>
+<pre><code>run_task1
+  -&gt; qkd.runCase
+       -&gt; rateFor
+            -&gt; qkd.keyRateAt
+                 -&gt; qkd.estimate
+                      -&gt; qkd.fluct
+                      -&gt; qkd.gain
+                 -&gt; H2</code></pre>
+<h2 id="数据形状">数据形状</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">阶段</th>
+<th style="text-align: left;">标量情形</th>
+<th style="text-align: left;">向量情形</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>L</code></td>
+<td style="text-align: left;">单个距离</td>
+<td style="text-align: left;"><span
+class="math inline">\(1\times301\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.u</code></td>
+<td style="text-align: left;">0.5</td>
+<td style="text-align: left;">优化时可能 <span
+class="math inline">\(1\times61\)</span> 或 <span
+class="math inline">\(1\times301\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(Q,E,T\)</span></td>
+<td style="text-align: left;">标量</td>
+<td style="text-align: left;">与
+<code>L</code>/参数同形状</td>
+</tr>
+<tr>
+<td style="text-align: left;">上下界</td>
+<td style="text-align: left;">标量</td>
+<td style="text-align: left;">同形状</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span
+class="math inline">\(R\)</span></td>
+<td style="text-align: left;">标量</td>
+<td style="text-align: left;"><span
+class="math inline">\(1\times301\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>所有内核函数都用
+<code>.*</code>、<code>./</code> 和逐元素幂
+<code>.^</code> 写成逐元素运算，
+所以同一套代码能同时处理标量和数组。</p>
+<h2 id="km-端到端示例">100 km 端到端示例</h2>
+<p>参数： <span class="math display">\[N=10^9,\quad
+\varepsilon=10^{-7},\quad \text{method}=\text{gauss},\quad L=100\text{
+km},\]</span> <span class="math display">\[u=0.5,\ v=0.1,\ P_u=0.6,\
+P_v=0.3,\
+P_{Z\mid u}=P_{Z\mid v}=P_Z^{B}=0.5,\]</span> <span
+class="math display">\[\alpha=0.2,\ \eta_d=0.5,\ d=10^{-6},\ e_d=0.015,\
+e_0=0.5,\ f=1.16.\]</span></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">步骤</th>
+<th style="text-align: left;">量</th>
+<th style="text-align: left;">公式</th>
+<th style="text-align: right;">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(2d(1-d)\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.999998\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_d10^{-\alpha L/10}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(5.000000\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_u,\eta_v\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(1-e^{-\eta
+l}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.496878\times10^{-3}\)</span>, <span
+class="math inline">\(4.998750\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u,Q_v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0+\eta_l\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.498878\times10^{-3}\)</span>, <span
+class="math inline">\(5.018750\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td style="text-align: left;"><span
+class="math inline">\(E_u,E_v\)</span></td>
+<td style="text-align: left;">上式</td>
+<td style="text-align: right;"><span
+class="math inline">\(1.538824\times10^{-2}\)</span>, <span
+class="math inline">\(1.693284\times10^{-2}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td style="text-align: left;"><span
+class="math inline">\(T_u,T_v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(E_lQ_l\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.845316\times10^{-5}\)</span>, <span
+class="math inline">\(8.498124\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td style="text-align: left;"><span
+class="math inline">\(N_{uZ},N_{vZ},N_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(P_uP_{Z\mid
+u}N,\ldots\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.0\times10^8\)</span>, <span
+class="math inline">\(1.5\times10^8\)</span>, <span
+class="math inline">\(1.0\times10^8\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: left;"><span
+class="math inline">\(n_{Wz}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(N_{uZ}Q_u+N_{vZ}Q_v\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(8.2494\times10^5\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0^L,Y_0^U\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0\pm\gamma\sqrt{Y_0/N_0}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.2466\times10^{-6}\)</span>, <span
+class="math inline">\(2.7534\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u^{Z,L},Q_u^{Z,U}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u\pm\gamma\sqrt{Q_u/N_{uZ}}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(2.4835\times10^{-3}\)</span>, <span
+class="math inline">\(2.5143\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_v^{Z,L},Q_v^{Z,U}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_v\pm\gamma\sqrt{Q_v/N_{vZ}}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(4.9213\times10^{-4}\)</span>, <span
+class="math inline">\(5.1162\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td style="text-align: left;"><span
+class="math inline">\(T_v^{X,U}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(T_v+\gamma\sqrt{T_v/N_{vX}}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(9.7661\times10^{-6}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">13</td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^u,P_2^u,P_0^u\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(e^{-u}u^n/n!\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(0.30327,\
+0.07582,\ 0.60653\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">14</td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^v,P_2^v,P_0^v\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(e^{-v}v^n/n!\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(0.09048,\
+0.004524,\ 0.90484\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">15</td>
+<td style="text-align: left;"><span
+class="math inline">\(\mathrm{den}\)</span></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^vP_2^u-P_1^uP_2^v\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(5.4881\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{Z,L},Y_1^{X,L}\)</span></td>
+<td style="text-align: left;">式 (3.28)</td>
+<td style="text-align: right;"><span
+class="math inline">\(4.6925\times10^{-3}\)</span>, <span
+class="math inline">\(4.6925\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">17</td>
+<td style="text-align: left;"><span
+class="math inline">\(e_1^{X,U}\)</span></td>
+<td style="text-align: left;">式 (3.29)</td>
+<td style="text-align: right;"><span
+class="math inline">\(2.1673\times10^{-2}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">18</td>
+<td style="text-align: left;"><span
+class="math inline">\(H_2(e_1^{X,U})\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(-\sum
+x\log_2x\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.15074\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">19</td>
+<td style="text-align: left;"><span
+class="math inline">\(H_2(E_u)\)</span></td>
+<td style="text-align: left;">同上</td>
+<td style="text-align: right;"><span
+class="math inline">\(0.11470\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">20</td>
+<td style="text-align: left;">收入</td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^uY_1^{Z,L}(1-H_2(e_1^{X,U}))\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(1.2086\times10^{-3}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">21</td>
+<td style="text-align: left;">支出</td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_ufH_2(E_u)\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(3.3243\times10^{-4}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">22</td>
+<td style="text-align: left;">资格系数</td>
+<td style="text-align: left;"><span class="math inline">\(P_uP_{Z\mid
+u}^{A}P_Z^{B}\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(0.15\)</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">23</td>
+<td style="text-align: left;"><span
+class="math inline">\(\mathbf{R}\)</span></td>
+<td style="text-align: left;">式 (3.30)</td>
+<td style="text-align: right;"><span
+class="math inline">\(\mathbf{1.3143\times10^{-4}}\)</span></td>
+</tr>
+</tbody>
+</table>
+<h1 id="常见误解">常见误解</h1>
+<h4 id="n-不同codefluctcode-会重新算吗">① “<span
+class="math inline">\(N\)</span> 不同，<code>fluct</code>
+会重新算吗？”</h4>
+<p>不会。<span class="math inline">\(N\)</span> 不是
+<code>fluct</code> 的输入；<code>fluct</code>
+只看 <code>method</code> 和 <code>eps</code>。
+<span class="math inline">\(N\)</span> 是在调用 <code>D.Q(Q, Nl,
+nW)</code> 时才传进去的。 <span class="math display">\[N\text{
+不同}\;\Longrightarrow\;\text{缓存照样命中}\;\Longrightarrow\;
+\text{但 }D.Q\text{ 用新的 }N\text{
+重新算}\;\Longrightarrow\;\text{区间数值不同}.\]</span></p>
+<h4 id="qet-是什么关系">② <span class="math inline">\(Q,E,T\)</span>
+是什么关系</h4>
+<p><span class="math display">\[\begin{aligned}
+Q&amp;=P(\text{响应}),\\
+E&amp;=P(\text{错}\mid\text{响应}),\\
+T&amp;=P(\text{响应且错})=Q\,E.
+\end{aligned}\]</span> <span class="math inline">\(Q\)</span>
+管“响不响”；<span class="math inline">\(E\)</span> 管“响得对不对”；<span
+class="math inline">\(T\)</span> 是两者的联合概率。</p>
+<h4 id="codep.p0code-和-p_0u-不是一回事">③ <code>p.P0</code>
+和 <span class="math inline">\(P_0^u\)</span> 不是一回事</h4>
+<ul>
+<li><p><code>p.P0</code>：Alice 选择发送真空态的概率（默认
+0.1）；</p></li>
+<li><p><span
+class="math inline">\(P_0^u=e^{-u}\)</span>：信号态脉冲里零光子的比例（默认
+0.6065）。</p></li>
+</ul>
+<h4 id="codeg.etacode-和-codeg.eta_ucode-不是一回事">④
+<code>g.eta</code> 和 <code>g.eta_u</code>
+不是一回事</h4>
+<ul>
+<li><p><code>g.eta</code>：一个光子的端到端透过率；</p></li>
+<li><p><code>g.eta_u</code>：一个多光子脉冲里“至少有一个光子被探测到”的概率。</p></li>
+</ul>
+<h4 id="t-是概率不是个数">⑤ <span class="math inline">\(T\)</span>
+是概率，不是个数</h4>
+<p><span class="math inline">\(T\)</span>
+是每个脉冲“既响应又出错”的概率。期望个数要乘脉冲数：<span
+class="math inline">\(T N_l\)</span>。</p>
+<h4 id="y_1e_1-不是实验量">⑥ <span
+class="math inline">\(Y_1,e_1\)</span> 不是实验量</h4>
+<p>实验只能测 <span class="math inline">\(Q,E\)</span>。<span
+class="math inline">\(Y_1,e_1\)</span>
+是由诱骗态公式估出来的上下界，不是直接测量值。</p>
+<h4 id="v-不直接进最终密钥率公式">⑦ <span
+class="math inline">\(v\)</span> 不直接进最终密钥率公式</h4>
+<p><span class="math inline">\(v,P_v,P_{Z\mid v}\)</span> 只参与
+<code>estimate</code>，用来估 <span
+class="math inline">\(Y_1,e_1\)</span>。 最终 <span
+class="math inline">\(R\)</span> 公式里看不到 <span
+class="math inline">\(v\)</span>，因为诱骗态本身不生成密钥，它的作用是“当参照物”。</p>
+<h4 id="优化不会污染原始参数">⑧ 优化不会污染原始参数</h4>
+<p><code>rateFor</code> 里先 <code>q = p</code>
+复制，再改 <code>q</code>。MATLAB 值语义保证调用方的
+<code>p</code> 不变。</p>
+<h1 id="代码索引与自检">代码索引与自检</h1>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">参数表、<span
+class="math inline">\(Y_0\)</span>、<span
+class="math inline">\(P_0\)</span></td>
+<td
+style="text-align: left;"><code>+qkd/params.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">透过率、增益、误码、误码计数</td>
+<td style="text-align: left;"><code>+qkd/gain.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">三种统计界、句柄工厂、缓存</td>
+<td style="text-align: left;"><code>+qkd/fluct.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">脉冲数、区间、式 (3.28)(3.29)</td>
+<td
+style="text-align: left;"><code>+qkd/estimate.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">式 (3.30)、<span
+class="math inline">\(H_2\)</span>、截断</td>
+<td
+style="text-align: left;"><code>+qkd/keyRateAt.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">距离扫描、三种优化模式、<span
+class="math inline">\(L_{\max}\)</span></td>
+<td
+style="text-align: left;"><code>+qkd/runCase.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">任务 1 脚本</td>
+<td
+style="text-align: left;"><code>tasks/run_task1.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">任务 2 脚本</td>
+<td
+style="text-align: left;"><code>tasks/run_task2.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">任务 3 脚本</td>
+<td
+style="text-align: left;"><code>tasks/run_task3.m</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">回归金标准</td>
+<td
+style="text-align: left;"><code>checks/runTests.m</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 class="unnumbered" id="建议的阅读顺序">建议的阅读顺序</h2>
+<ol>
+<li><p><code>params.m</code>：先知道有哪些参数；</p></li>
+<li><p><code>gain.m</code>：理解“损耗 <span
+class="math inline">\(\to\)</span> 增益 <span
+class="math inline">\(\to\)</span> 误码”的模型；</p></li>
+<li><p><code>keyRateAt.m</code>：看最终公式长什么样；</p></li>
+<li><p><code>fluct.m</code>：理解“为什么要留余量”；</p></li>
+<li><p><code>estimate.m</code>：最后啃诱骗态估计；</p></li>
+<li><p><code>runCase.m</code>：看这些东西怎么串成曲线。</p></li>
+</ol>
+<h2 class="unnumbered" id="自检">自检</h2>
+<p>在 MATLAB 工程根目录：</p>
+<pre><code>addpath(genpath(pwd));
+runTests      % 18 regression assertions
+selfTest      % print sampled values for tasks 1-3
+verify        % write results/verify.log</code></pre>
+<p>如果 <code>runTests</code> 全
+PASS，说明本文描述的计算链与代码实现一致。</p>
+<h1 id="符号表">符号表</h1>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">代码</th>
+<th style="text-align: left;">数学</th>
+<th style="text-align: left;">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>p.u</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(u\)</span></td>
+<td style="text-align: left;">信号态平均光子数</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.v</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(v\)</span></td>
+<td style="text-align: left;">诱骗态平均光子数</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pu</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_u\)</span></td>
+<td style="text-align: left;">信号态概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pv</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_v\)</span></td>
+<td style="text-align: left;">诱骗态概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.P0</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_0\)</span></td>
+<td style="text-align: left;">真空态概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Y0</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_0\)</span></td>
+<td style="text-align: left;">真空态响应率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pza_u</code></td>
+<td style="text-align: left;"><span class="math inline">\(P_{Z\mid
+u}^{A}\)</span></td>
+<td style="text-align: left;">信号态选 <span
+class="math inline">\(Z\)</span> 基概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.Pzb</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_Z^{B}\)</span></td>
+<td style="text-align: left;">Bob 选 <span
+class="math inline">\(Z\)</span> 基概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.f</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(f\)</span></td>
+<td style="text-align: left;">纠错效率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.alpha</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(\alpha\)</span></td>
+<td style="text-align: left;">光纤损耗</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.etad</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta_d\)</span></td>
+<td style="text-align: left;">探测器效率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.ed</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(e_d\)</span></td>
+<td style="text-align: left;">本底误码率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>p.e0</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(e_0\)</span></td>
+<td style="text-align: left;">真空态误码率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g.eta</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(\eta\)</span></td>
+<td style="text-align: left;">端到端透过率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g.eta_u</code></td>
+<td style="text-align: left;"><span class="math inline">\(1-e^{-\eta
+u}\)</span></td>
+<td style="text-align: left;">信号态至少探测到一个光子的概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g.Qu</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(Q_u\)</span></td>
+<td style="text-align: left;">信号态增益</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g.Eu</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(E_u\)</span></td>
+<td style="text-align: left;">信号态误码率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>g.Tu</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(T_u\)</span></td>
+<td style="text-align: left;">信号态误码计数</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>P1u</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^u\)</span></td>
+<td style="text-align: left;">信号态单光子概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>P2u</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_2^u\)</span></td>
+<td style="text-align: left;">信号态双光子概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>P0u</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_0^u\)</span></td>
+<td style="text-align: left;">信号态零光子概率</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Y1Lz</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{Z,L}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(Z\)</span>
+基单光子响应率下界</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Y1Lx</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(Y_1^{X,L}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(X\)</span>
+基单光子响应率下界</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>e1Ux</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(e_1^{X,U}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(X\)</span>
+基单光子误码率上界</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>den</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(P_1^vP_2^u-P_1^uP_2^v\)</span></td>
+<td style="text-align: left;">式 (3.28) 的分母</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>R</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(R\)</span></td>
+<td style="text-align: left;">安全密钥率（bit/pulse）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Lmax</code></td>
+<td style="text-align: left;"><span
+class="math inline">\(L_{\max}\)</span></td>
+<td style="text-align: left;">最远成码距离（km）</td>
+</tr>
+</tbody>
+</table>
+<div class="center">
+<p>编译说明：本文使用 <code>ctexart</code>，请用
+<strong>XeLaTeX</strong> 编译。<br />
+Overleaf：Menu <span class="math inline">\(\to\)</span> Compiler <span
+class="math inline">\(\to\)</span> XeLaTeX；本地：用 XeLaTeX
+连续编译两次。</p>
+</div>
+</body>
+</html>
